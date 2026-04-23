@@ -23,13 +23,17 @@ supabase = init_connection()
 def generar_codigo():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-# 3. ESTILO PERSONALIZADO
+# 3. ESTILO PERSONALIZADO E ICONO PARA MÓVIL
 st.markdown("""
     <style>
     .main { background-color: #f5f7f9; }
     .stButton>button { width: 100%; border-radius: 20px; background-color: #10b981; color: white; border: none; }
     .stButton>button:hover { background-color: #059669; color: white; }
     </style>
+    
+    <!-- Meta etiquetas para el icono al guardar en el móvil -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2163/2163154.png">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2163/2163154.png">
     """, unsafe_allow_html=True)
 
 st.title("🤝 PactaLoopa")
@@ -38,7 +42,7 @@ st.title("🤝 PactaLoopa")
 if "grupo_id" not in st.session_state:
     st.session_state.grupo_id = None
     st.session_state.nombre_pacto = ""
-    st.session_state.vista = "inicio" # Nueva lógica para controlar la pantalla
+    st.session_state.vista = "inicio"
 
 # --- NAVEGACIÓN ---
 
@@ -81,7 +85,7 @@ elif st.session_state.vista == "crear":
                 res = supabase.table("grupos").insert(data).execute()
                 st.session_state.grupo_id = res.data[0]['id']
                 st.session_state.nombre_pacto = nombre_pacto_input
-                st.session_state.vista = "dashboard" # Pasamos al dashboard
+                st.session_state.vista = "dashboard"
                 st.rerun()
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
@@ -106,14 +110,13 @@ elif st.session_state.vista == "unirse":
                 supabase.table("participantes").insert({"grupo_id": id_g, "nombre_usuario": tu_nombre}).execute()
                 st.session_state.grupo_id = id_g
                 st.session_state.nombre_pacto = grupo.data[0]['nombre']
-                st.session_state.vista = "dashboard" # Pasamos al dashboard
+                st.session_state.vista = "dashboard"
                 st.rerun()
             else:
                 st.error("Código no encontrado.")
 
-# VISTA 4: DASHBOARD (Ya estás dentro)
+# VISTA 4: DASHBOARD
 elif st.session_state.vista == "dashboard":
-    # Sidebar solo aparece cuando ya estamos dentro del pacto
     with st.sidebar:
         st.info(f"📍 Pacto: **{st.session_state.nombre_pacto}**")
         if st.button("🚪 Salir del Pacto"):
@@ -123,7 +126,6 @@ elif st.session_state.vista == "dashboard":
 
     st.subheader(f"Pacto: {st.session_state.nombre_pacto}")
     
-    # Obtener participantes REALES
     participantes_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("id").execute()
     lista_p = participantes_db.data
 
@@ -160,12 +162,11 @@ elif st.session_state.vista == "dashboard":
                 except Exception as e:
                     st.error(f"Error al actualizar: {e}")
 
-st.markdown("---")
-st.caption("PactaLoopa - Registro transparente para grupos de confianza.")
 # --- PIE DE PÁGINA ---
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center;'>
+    <p style='color: gray; font-size: 0.8em;'>PactaLoopa - Registro transparente para grupos de confianza.</p>
     <p>PactaLoopa es una herramienta de uso libre y gratuito.</p>
     <p>¿Te ha servido? Puedes apoyar el proyecto invitándome a un café en: 
     <br>
