@@ -11,3 +11,4 @@ ENV/
 
 # Variables sensibles (¡Importante para Supabase después!)
 .env
+.streamlit/secrets.toml
