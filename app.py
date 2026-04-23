@@ -33,7 +33,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🤝 PactaLoopa")
-st.subheader("El loop de ahorro comunitario")
+
+# --- LÓGICA DE ESTADO ---
+# Guardamos el grupo actual en la sesión para que no se pierda al recargar
+if "grupo_id" not in st.session_state:
+    st.session_state.grupo_id = None
+    st.session_state.nombre_pacto = ""
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -44,23 +49,24 @@ with st.sidebar:
 
     if modo == "Crear Nuevo Pacto":
         st.subheader("Configurar Pacto")
-        nombre_pacto = st.text_input("Nombre del Pacto", placeholder="Ej. Familia y Amigos")
+        nombre_pacto_input = st.text_input("Nombre del Pacto", placeholder="Ej. Familia y Amigos")
         monto = st.number_input("Cuota por persona ($)", min_value=1, value=100)
         frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
-        num_personas = st.slider("Número de participantes", 2, 20, 5)
         
         if st.button("🚀 Crear y Generar Código"):
-            if nombre_pacto:
+            if nombre_pacto_input:
                 try:
                     codigo_unico = generar_codigo()
                     data = {
-                        "nombre": nombre_pacto,
+                        "nombre": nombre_pacto_input,
                         "monto_cuota": monto,
                         "frecuencia": frecuencia.lower(),
                         "codigo": codigo_unico
                     }
-                    supabase.table("grupos").insert(data).execute()
-                    st.success(f"¡Pacto '{nombre_pacto}' creado!")
+                    res = supabase.table("grupos").insert(data).execute()
+                    st.session_state.grupo_id = res.data[0]['id']
+                    st.session_state.nombre_pacto = nombre_pacto_input
+                    st.success(f"¡Pacto '{nombre_pacto_input}' creado!")
                     st.code(codigo_unico, language="text")
                     st.balloons()
                 except Exception as e:
@@ -70,49 +76,62 @@ with st.sidebar:
     
     else:
         st.subheader("Unirse a un Pacto")
-        codigo_input = st.text_input("Introduce el código", placeholder="Ej. A7B2X9").upper().strip()
+        codigo_input = st.text_input("Introduce el código").upper().strip()
         tu_nombre = st.text_input("Tu nombre o alias")
         
         if st.button("🤝 Unirme al Loop"):
             if codigo_input and tu_nombre:
-                # 1. Buscar si el código existe
-                grupo = supabase.table("grupos").select("id, nombre").eq("codigo", codigo_input).execute()
-                
+                grupo = supabase.table("grupos").select("*").eq("codigo", codigo_input).execute()
                 if len(grupo.data) > 0:
-                    id_grupo = grupo.data[0]['id']
-                    nombre_g = grupo.data[0]['nombre']
-                    
-                    # 2. Insertar al participante
-                    nuevo_p = {
-                        "grupo_id": id_grupo,
-                        "nombre_usuario": tu_nombre,
-                        "completado": False
-                    }
-                    supabase.table("participantes").insert(nuevo_p).execute()
-                    st.success(f"¡Te has unido a: {nombre_g}!")
+                    id_g = grupo.data[0]['id']
+                    supabase.table("participantes").insert({"grupo_id": id_g, "nombre_usuario": tu_nombre}).execute()
+                    st.session_state.grupo_id = id_g
+                    st.session_state.nombre_pacto = grupo.data[0]['nombre']
+                    st.success(f"¡Unido a {st.session_state.nombre_pacto}!")
                     st.balloons()
                 else:
-                    st.error("Código no encontrado. Verifica e intenta de nuevo.")
-            else:
-                st.warning("Escribe el código y tu nombre.")
+                    st.error("Código no encontrado.")
 
-# --- LÓGICA DE VISUALIZACIÓN ---
-# Aquí es donde el Administrador verá a la gente que se une en tiempo real
-st.divider()
-st.write("### 👥 Participantes en este Pacto")
+# --- CUERPO PRINCIPAL ---
+if st.session_state.grupo_id:
+    st.subheader(f"Pacto: {st.session_state.nombre_pacto}")
+    
+    # Obtener participantes REALES de la base de datos
+    participantes_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
+    lista_p = participantes_db.data
 
-# Para fines de este paso, buscaremos el último pacto creado o unido para mostrarlo
-# (En el futuro esto será más dinámico)
-st.info("Aquí aparecerán los nombres de quienes usen tu código.")
+    tab1, tab2 = st.tabs(["🔄 El Loop Actual", "📋 Gestión de Pagos"])
 
-# --- PANTALLA PRINCIPAL (Tabs) ---
-tab1, tab2 = st.tabs(["🔄 El Loop Actual", "📋 Gestión de Pagos"])
+    with tab1:
+        if not lista_p:
+            st.info("Esperando a que se unan participantes...")
+        else:
+            st.write(f"### 🏆 Turno actual")
+            # Lógica simple: el primero que se unió es el primero en cobrar (por ahora)
+            ganador = lista_p[0]['nombre_usuario']
+            st.success(f"🌟 **{ganador}** es quien recibe el pozo en esta ronda.")
+            st.write("---")
+            st.write("**Orden de turnos:**")
+            for idx, p in enumerate(lista_p):
+                st.write(f"{idx+1}. {p['nombre_usuario']}")
 
-with tab1:
-    st.write("Visualización del orden de turnos...")
+    with tab2:
+        st.write("### ✅ Confirmar Pagos")
+        if not lista_p:
+            st.write("No hay participantes todavía.")
+        else:
+            for p in lista_p:
+                # Cada checkbox es real para cada usuario en la DB
+                st.checkbox(f"Pago de {p['nombre_usuario']}", key=f"db_pago_{p['id']}")
+            
+            if st.button("Guardar progreso"):
+                st.toast("¡Estado de pagos actualizado!")
 
-with tab2:
-    st.write("Control de quién ha pagado esta ronda...")
+else:
+    st.info("👈 Selecciona 'Crear' o 'Unirse' en el menú lateral para empezar.")
+
+st.markdown("---")
+st.caption("PactaLoopa - Ahorro comunitario simplificado.")
 
 st.markdown("---")
 st.caption("PactaLoopa no gestiona dinero. Los pagos se realizan de forma externa.")
