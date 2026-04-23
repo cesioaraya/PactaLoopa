@@ -1,2 +1,6 @@
 streamlit
 pandas
+streamlit
+pandas
+supabase
+python-dotenv
