@@ -28,6 +28,7 @@ st.markdown("""
     <style>
     .stButton>button { border-radius: 20px; width: 100%; }
     .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e1e4e8; text-align: center; }
+    .catch-up { background-color: #fff3cd; padding: 15px; border-radius: 10px; border: 1px solid #ffeeba; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -60,7 +61,6 @@ elif st.session_state.vista == "crear":
             codigo = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre_pacto, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "codigo": codigo, "password": pass_pacto}).execute()
             gid = res.data[0]['id']
-            # El primer participante insertado es el Admin por defecto
             supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": tu_nombre, "posicion_orden": 0}).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": tu_nombre, "vista": "dashboard"})
             st.rerun()
@@ -83,7 +83,9 @@ elif st.session_state.vista == "seleccionar_usuario":
     if sel == "-- Nuevo --":
         nuevo = st.text_input("Tu nombre").strip()
         if st.button("Unirme") and nuevo:
-            supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": nuevo, "posicion_orden": len(nombres)}).execute()
+            # Lógica: Se pone al final del orden actual
+            max_pos = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
+            supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": nuevo, "posicion_orden": max_pos + 1}).execute()
             st.session_state.mi_nombre = nuevo
             st.session_state.vista = "dashboard"; st.rerun()
     else:
@@ -96,15 +98,11 @@ elif st.session_state.vista == "dashboard":
     g_res = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     grupo = g_res.data[0]
     
-    # Obtenemos participantes ordenados por ID para saber quién fue el primero (Admin)
     p_admin_check = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("id").execute()
     admin_nombre = p_admin_check.data[0]['nombre_usuario']
     
-    # Obtenemos participantes para el orden del Loop
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
-    
-    # CORRECCIÓN CLAVE: El admin se identifica por nombre inicial, no por posición en el loop
     es_admin = (st.session_state.mi_nombre == admin_nombre)
 
     with st.sidebar:
@@ -137,7 +135,7 @@ elif st.session_state.vista == "dashboard":
             col_a, col_b = st.columns([3, 1])
             with col_a:
                 st.write(f"**{i+1}. {p['nombre_usuario']}**")
-                st.caption(f"📅 Recibe: {f_pago.strftime('%d %b %Y')}")
+                st.caption(f"📅 Fecha: {f_pago.strftime('%d %b %Y')}")
             with col_b:
                 if p['completado']: st.success("✅")
                 elif p['aviso_pago']: st.warning("🔔")
@@ -147,70 +145,79 @@ elif st.session_state.vista == "dashboard":
         yo = next(p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre)
         st.subheader(f"Resumen de {st.session_state.mi_nombre}")
         
-        # Pagos realizados por el grupo (quienes ya cobraron)
-        pagos_realizados = len(cobrados)
+        # Pagos que el grupo ya entregó
+        pagos_entregados = len(cobrados)
         
+        # LÓGICA DE PUESTA AL DÍA PARA USUARIOS NUEVOS
+        # Si yo soy el #6 y ya cobraron 3 personas, debo pagar 3 cuotas.
+        if not yo['completado']:
+            st.markdown(f"""
+            <div class="catch-up">
+            ⚠️ <b>Puesta al día:</b> Se han realizado {pagos_entregados} pagos en este ciclo.<br>
+            Debes asegurarte de haber entregado tu cuota a esos {pagos_entregados} miembros.
+            </div>
+            """, unsafe_allow_html=True)
+
         col_m1, col_m2 = st.columns(2)
-        col_m1.metric("Cuotas cobradas", f"{pagos_realizados}")
-        col_m2.metric("Restantes", f"{len(pendientes)}")
+        col_m1.metric("Pagos del Loop", f"{pagos_entregados}")
+        col_m2.metric("Mi turno", f"#{yo['posicion_orden'] + 1}")
 
         st.write("---")
         if yo['completado']:
-            st.success("🎉 Ya recibiste tu pozo de este ciclo.")
+            st.success("🎉 Ya recibiste tu pozo.")
         elif yo['aviso_pago']:
-            st.warning("Aviso enviado. Esperando validación del Admin.")
+            st.warning("Aviso enviado al Admin. Esperando validación de tus pagos.")
             if st.button("❌ Cancelar Aviso"):
                 supabase.table("participantes").update({"aviso_pago": False}).eq("id", yo['id']).execute()
                 st.rerun()
         else:
-            st.info(f"Cuota: **${grupo['monto_cuota']}**")
-            if st.button("📢 MARCAR COMO PAGADO"):
+            st.info(f"Cuota actual: **${grupo['monto_cuota']}**")
+            st.write(f"Al marcar como pagado, confirmas que has pagado a los {pagos_entregados} que ya cobraron.")
+            if st.button("📢 NOTIFICAR PAGOS REALIZADOS"):
                 supabase.table("participantes").update({"aviso_pago": True}).eq("id", yo['id']).execute()
                 st.rerun()
 
     if es_admin:
         with t3:
-            st.subheader("Gestión de Pagos")
+            st.subheader("Validación de Pagos")
             avisos = [p for p in participantes if p['aviso_pago'] and not p['completado']]
+            
             if avisos:
                 for a in avisos:
-                    col1, col2 = st.columns([2, 1])
-                    col1.write(f"¿Confirmar pago de **{a['nombre_usuario']}**?")
-                    if col2.button("Confirmar ✅", key=f"admin_c_{a['id']}"):
-                        supabase.table("participantes").update({"completado": True, "aviso_pago": False}).eq("id", a['id']).execute()
-                        st.rerun()
+                    with st.expander(f"🔔 Aviso de {a['nombre_usuario']}", expanded=True):
+                        st.write(f"Este usuario solicita confirmar que ya pagó sus cuotas a los {len(cobrados)} que ya recibieron el pozo.")
+                        if st.button("Confirmar y Validar ✅", key=f"adm_v_{a['id']}"):
+                            # Si es el turno de esta persona, se marca como completado (recibió pozo)
+                            # Si no es su turno, el aviso simplemente sirve para que el admin sepa que está al día
+                            # Aquí lo marcamos como completado si el admin decide que ya "cobró" o está listo.
+                            supabase.table("participantes").update({"completado": True, "aviso_pago": False}).eq("id", a['id']).execute()
+                            st.rerun()
             else:
-                st.info("No hay avisos de pago pendientes.")
+                st.info("No hay notificaciones de pago pendientes.")
 
             st.write("---")
-            st.subheader("Reordenar Pendientes")
-            st.caption("Solo puedes mover a quienes no han recibido el dinero.")
-            
+            st.subheader("Reordenar Loop")
             nombres_ya = [p['nombre_usuario'] for p in participantes if p['completado']]
             nombres_no = [p['nombre_usuario'] for p in participantes if not p['completado']]
             
             if len(nombres_no) > 1:
-                nuevo_orden = st.multiselect("Nuevo orden para pendientes:", nombres_no, default=nombres_no)
-                
-                if st.button("💾 Guardar Nuevo Orden"):
+                nuevo_orden = st.multiselect("Reordenar pendientes (el último será el nuevo):", nombres_no, default=nombres_no)
+                if st.button("💾 Guardar Orden"):
                     if len(nuevo_orden) == len(nombres_no):
                         orden_final = nombres_ya + nuevo_orden
                         for idx, nombre in enumerate(orden_final):
                             supabase.table("participantes").update({"posicion_orden": idx}).eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", nombre).execute()
-                        st.success("¡Orden actualizado!")
+                        st.success("Orden actualizado")
                         st.rerun()
-            else:
-                st.write("No hay suficientes personas pendientes para reordenar.")
-
+            
             st.write("---")
-            with st.expander("⚠️ Zona de Peligro"):
-                if st.button("ELIMINAR PACTO DEFINITIVAMENTE"):
+            with st.expander("⚠️ Peligro"):
+                if st.button("BORRAR TODO"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
                     supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
-                    st.session_state.vista = "inicio"
-                    st.rerun()
+                    st.session_state.vista = "inicio"; st.rerun()
     else:
         with t3:
-            st.info("ℹ️ Esta sección contiene información general del grupo.")
-            st.write(f"Administrador: **{admin_nombre}**")
-            st.write(f"Frecuencia de pago: **{grupo['frecuencia'].capitalize()}**")
+            st.info("Sección informativa")
+            st.write(f"Admin: {admin_nombre}")
+            st.write(f"Frecuencia: {grupo['frecuencia']}")
