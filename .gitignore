@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+
+# Streamlit
+.streamlit/config.toml
+
+# Variables sensibles (¡Importante para Supabase después!)
+.env
