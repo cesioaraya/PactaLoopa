@@ -27,9 +27,7 @@ def generar_codigo():
 st.markdown("""
     <style>
     .stButton>button { border-radius: 20px; }
-    .status-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #ddd; }
-    .admin-confirm { background-color: #d1fae5; border-left: 5px solid #10b981; }
-    .user-pending { background-color: #fef3c7; border-left: 5px solid #f59e0b; }
+    .stat-card { background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e1e4e8; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -40,7 +38,7 @@ if "grupo_id" not in st.session_state:
     st.session_state.vista = "inicio"
     st.session_state.mi_nombre = ""
 
-# --- NAVEGACIÓN INICIO (Crear/Unirse) se mantiene igual ---
+# --- LÓGICA DE NAVEGACIÓN INICIAL ---
 if st.session_state.vista == "inicio":
     col1, col2 = st.columns(2)
     with col1:
@@ -74,8 +72,7 @@ elif st.session_state.vista == "unirse":
         g = supabase.table("grupos").select("*").eq("codigo", c_in).eq("password", p_in).execute()
         if g.data:
             st.session_state.grupo_id = g.data[0]['id']
-            st.session_state.vista = "seleccionar_usuario"
-            st.rerun()
+            st.session_state.vista = "seleccionar_usuario"; st.rerun()
         else: st.error("Datos incorrectos")
 
 elif st.session_state.vista == "seleccionar_usuario":
@@ -95,7 +92,6 @@ elif st.session_state.vista == "seleccionar_usuario":
 
 # --- DASHBOARD PRINCIPAL ---
 elif st.session_state.vista == "dashboard":
-    # Cargar datos
     g_res = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     grupo = g_res.data[0]
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
@@ -110,9 +106,17 @@ elif st.session_state.vista == "dashboard":
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if es_admin else "ℹ️ Info"])
 
-    # TAB 1: EL LOOP & CALENDARIO
     with t1:
-        st.subheader("Orden y Fechas")
+        st.subheader("Estado General del Pacto")
+        # Admin ve resumen de quienes cobraron
+        cobrados = [p for p in participantes if p['completado']]
+        pendientes = [p for p in participantes if not p['completado']]
+        
+        c1, c2 = st.columns(2)
+        c1.metric("Ya cobraron", len(cobrados))
+        c2.metric("Faltan por cobrar", len(pendientes))
+        
+        st.write("---")
         f_inicio = datetime.fromisoformat(grupo['creado_en'].split('T')[0])
         dias = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
         
@@ -121,67 +125,84 @@ elif st.session_state.vista == "dashboard":
             col_a, col_b = st.columns([3, 1])
             with col_a:
                 st.write(f"**{i+1}. {p['nombre_usuario']}**")
-                st.caption(f"📅 {f_pago.strftime('%d %b')}")
+                st.caption(f"📅 Recibe aprox: {f_pago.strftime('%d %b %Y')}")
             with col_b:
-                if p['completado']: st.success("Confirmado")
-                elif p['aviso_pago']: st.warning("Pend. Confirmar")
-                else: st.info("Pendiente")
+                if p['completado']: st.success("Cobrado")
+                elif p['aviso_pago']: st.warning("Avisó")
+                else: st.info("Espera")
 
-    # TAB 2: MI PAGO (Doble Check)
     with t2:
         yo = next(p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre)
-        st.subheader("Gestión de mi cuota")
-        st.metric("Monto a pagar", f"${grupo['monto_cuota']}")
+        st.subheader(f"Hola, {st.session_state.mi_nombre}")
         
+        # Estadísticas personales de pago
+        total_pactantes = len(participantes)
+        # En una tanda simple, cada uno paga a todos menos a si mismo. 
+        # Pero suele contarse como "cuotas realizadas" respecto al ciclo.
+        pagos_realizados = len([p for p in participantes if p['completado']])
+        
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.metric("Cuotas pagadas", f"{pagos_realizados}")
+        with col_m2:
+            st.metric("Faltan", f"{max(0, total_pactantes - pagos_realizados)}")
+
+        st.write("---")
         if yo['completado']:
-            st.success("✅ ¡Pago confirmado por el administrador!")
+            st.success("✅ Ya has recibido tu pozo de este ciclo.")
         elif yo['aviso_pago']:
-            st.warning("⏳ Ya avisaste del pago. Esperando confirmación del administrador.")
-            if st.button("Cancelar aviso de pago"):
+            st.warning("⏳ Has notificado que ya pagaste tu parte. El admin debe confirmar.")
+            if st.button("Cancelar aviso"):
                 supabase.table("participantes").update({"aviso_pago": False}).eq("id", yo['id']).execute()
                 st.rerun()
         else:
-            if st.button("🔔 Marcar como PAGADO (Avisar al admin)"):
+            st.info(f"Monto de cuota: **${grupo['monto_cuota']}**")
+            if st.button("🔔 Avisar que ya pagué"):
                 supabase.table("participantes").update({"aviso_pago": True}).eq("id", yo['id']).execute()
                 st.rerun()
 
-    # TAB 3: ADMIN (Confirmar pagos y Reordenar)
     if es_admin:
         with t3:
-            st.subheader("🛡️ Panel de Control")
+            st.subheader("🛡️ Panel de Administración")
             
-            # Sub-sección: Confirmar Pagos
-            st.write("---")
-            st.write("#### Confirmar Avisos de Usuarios")
+            # 1. Confirmar Pagos
+            st.write("#### Confirmar Avisos de Pago")
             avisos = [p for p in participantes if p['aviso_pago'] and not p['completado']]
             if avisos:
                 for a in avisos:
-                    col1, col2 = st.columns([2, 1])
-                    col1.write(f"¿Confirmas el pago de **{a['nombre_usuario']}**?")
-                    if col2.button("✅ Confirmar", key=f"conf_{a['id']}"):
+                    c1, c2 = st.columns([2, 1])
+                    c1.write(f"¿Confirmar pago de **{a['nombre_usuario']}**?")
+                    if c2.button("✅ Sí", key=f"c_{a['id']}"):
                         supabase.table("participantes").update({"completado": True}).eq("id", a['id']).execute()
                         st.rerun()
-            else:
-                st.info("No hay avisos de pago pendientes.")
+            else: st.info("No hay avisos pendientes.")
 
-            # Sub-sección: Reordenar
+            # 2. Reordenar (Solo los que NO han cobrado)
             st.write("---")
-            st.write("#### Cambiar Orden del Loop")
-            nombres_orden = [p['nombre_usuario'] for p in participantes]
-            nuevo_orden = st.multiselect("Arrastra o selecciona en el nuevo orden:", nombres_orden, default=nombres_orden)
+            st.write("#### Reordenar miembros pendientes")
+            st.caption("Solo puedes mover a los que aún no han recibido el pozo.")
             
-            if st.button("💾 Guardar Nuevo Orden"):
-                if len(nuevo_orden) == len(nombres_orden):
-                    for idx, nombre in enumerate(nuevo_orden):
-                        supabase.table("participantes").update({"posicion_orden": idx}).eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", nombre).execute()
-                    st.success("Orden actualizado")
-                    st.rerun()
-                else: st.error("Debes incluir a todos los participantes en la lista.")
+            ya_cobraron = [p['nombre_usuario'] for p in participantes if p['completado']]
+            no_cobraron = [p['nombre_usuario'] for p in participantes if not p['completado']]
+            
+            if len(no_cobraron) > 1:
+                nuevo_orden_pendientes = st.multiselect("Ordena a los pendientes:", no_cobraron, default=no_cobraron)
+                
+                if st.button("💾 Guardar Nuevo Orden"):
+                    if len(nuevo_orden_pendientes) == len(no_cobraron):
+                        orden_final = ya_cobraron + nuevo_orden_pendientes
+                        for idx, nombre in enumerate(orden_final):
+                            supabase.table("participantes").update({"posicion_orden": idx}).eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", nombre).execute()
+                        st.success("Orden actualizado")
+                        st.rerun()
+                    else: st.error("Debes incluir a todos los pendientes.")
+            else:
+                st.write("No hay suficientes miembros pendientes para reordenar.")
 
-            # Sub-sección: Eliminar
+            # 3. Eliminar Pacto
             st.write("---")
-            if st.checkbox("Mostrar opciones de eliminación"):
-                if st.button("🔥 ELIMINAR TODO EL PACTO"):
+            with st.expander("Opciones de eliminación"):
+                if st.button("🔥 ELIMINAR PACTO COMPLETO"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
                     supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
                     st.session_state.vista = "inicio"; st.rerun()
