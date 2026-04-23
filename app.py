@@ -29,6 +29,7 @@ st.markdown("""
     .stButton>button { border-radius: 20px; width: 100%; }
     .days-badge { background-color: #e8f0fe; color: #1a73e8; padding: 5px 10px; border-radius: 10px; font-weight: bold; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; }
+    .code-box { background-color: #f0f2f6; padding: 10px; border-radius: 10px; border: 1px dashed #4e4e4e; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -123,11 +124,9 @@ elif st.session_state.vista == "dashboard":
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
     
-    # Identificar admin (primer participante registrado)
     admin_nombre = supabase.table("participantes").select("nombre_usuario").eq("grupo_id", st.session_state.grupo_id).order("id").limit(1).execute().data[0]['nombre_usuario']
     es_admin = (st.session_state.mi_nombre == admin_nombre)
 
-    # Lógica de fechas
     f_inicio_pacto = date.fromisoformat(grupo['fecha_inicio'])
     salto = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
     
@@ -182,15 +181,27 @@ elif st.session_state.vista == "dashboard":
 
     if es_admin:
         with t3:
+            # --- CÓDIGO PERMANENTE PARA EL ADMIN ---
+            st.subheader("🔑 Acceso para Miembros")
+            st.write("Comparte este código y contraseña con tu grupo:")
+            col_cod1, col_cod2 = st.columns(2)
+            with col_cod1:
+                st.code(grupo['codigo'], language=None)
+                st.caption("Código de Grupo")
+            with col_cod2:
+                st.code(grupo['password'], language=None)
+                st.caption("Contraseña")
+            
+            st.write("---")
             st.subheader("Control del Ciclo")
             if st.button("♻️ LIMPIAR TABLERO (Nuevo Ciclo)"):
-                supabase.table("participantes").update({"completado": False, "aviso_pago": False}).eq("id", st.session_state.grupo_id).execute()
+                supabase.table("participantes").update({"completado": False, "aviso_pago": False}).eq("grupo_id", st.session_state.grupo_id).execute()
                 supabase.table("grupos").update({"fecha_inicio": date.today().isoformat()}).eq("id", st.session_state.grupo_id).execute()
                 st.rerun()
 
             st.write("---")
             estado_insc = "Abiertas" if grupo['abierto'] else "Cerradas"
-            if st.button(f"🚪 {'Cerrar' if grupo['abierto'] else 'Abrir'} Inscripciones"):
+            if st.button(f"🚪 {'Cerrar' if grupo['abierto'] else 'Abrir'} Inscripciones (Ahora: {estado_insc})"):
                 supabase.table("grupos").update({"abierto": not grupo['abierto']}).eq("id", st.session_state.grupo_id).execute()
                 st.rerun()
 
@@ -221,21 +232,17 @@ elif st.session_state.vista == "dashboard":
             opciones_eliminar = [p['nombre_usuario'] for p in participantes if not p['completado'] and p['nombre_usuario'] != admin_nombre]
             if opciones_eliminar:
                 u_elim = st.selectbox("Seleccionar miembro:", opciones_eliminar)
-                if st.button("🗑️ Eliminar Miembro"):
+                if st.button("🗑️ Eliminar Miembro Seleccionado"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", u_elim).execute()
                     st.rerun()
 
-            # --- SECCIÓN RECUPERADA: ELIMINAR GRUPO ---
+            # --- ZONA PELIGROSA ---
             st.write("---")
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             st.subheader("☢️ Zona Peligrosa")
-            st.write("Borrar el pacto eliminará a todos los miembros y datos permanentemente.")
-            if st.button("🔥 ELIMINAR ESTE PACTO DEFINITIVAMENTE"):
-                # 1. Borrar participantes asociados
+            if st.button("🔥 ELIMINAR TODO ESTE PACTO"):
                 supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
-                # 2. Borrar el grupo
                 supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
-                # 3. Limpiar sesión
                 st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
