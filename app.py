@@ -132,8 +132,17 @@ elif st.session_state.vista == "dashboard":
     tab1, tab2 = st.tabs(["🔄 El Loop Actual", "📋 Gestión de Pagos"])
 
     with tab1:
+        # --- NUEVO BLOQUE PARA MOSTRAR EL CÓDIGO SIEMPRE ---
+        g_info = supabase.table("grupos").select("codigo").eq("id", st.session_state.grupo_id).execute()
+        codigo_pacto = g_info.data[0]['codigo'] if g_info.data else "N/A"
+        
+        st.info(f"### 🆔 Código de Invitación: `{codigo_pacto}`")
+        st.caption("Comparte este código con tus amigos para que se unan al pacto.")
+        st.divider()
+        # --------------------------------------------------
+
         if not lista_p:
-            st.info("Esperando participantes... comparte el código con tu grupo.")
+            st.warning("Aún no hay participantes en este loop.")
         else:
             st.write("### 🏆 Orden de Beneficiarios")
             for idx, p in enumerate(lista_p):
