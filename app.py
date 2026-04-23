@@ -130,13 +130,6 @@ elif st.session_state.vista == "dashboard":
     f_inicio_pacto = date.fromisoformat(grupo['fecha_inicio'])
     salto = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
     
-    proximo_en_cobrar = next((p for p in participantes if not p['completado']), None)
-    dias_restantes = 0
-    if proximo_en_cobrar:
-        idx_prox = participantes.index(proximo_en_cobrar)
-        fecha_prox = f_inicio_pacto + timedelta(days=idx_prox * salto)
-        dias_restantes = (fecha_prox - date.today()).days
-
     with st.sidebar:
         st.write(f"### 🛡️ {grupo['nombre']}")
         st.info(f"Código: **{grupo['codigo']}**")
@@ -162,8 +155,17 @@ elif st.session_state.vista == "dashboard":
     with t2:
         yo = next(p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre)
         st.subheader(f"Estado de {st.session_state.mi_nombre}")
+        
+        # Lógica de fecha dinámica
+        proximo_en_cobrar = next((p for p in participantes if not p['completado']), None)
         if proximo_en_cobrar:
-            st.markdown(f"⏳ Próximo pago del grupo en: <span class='days-badge'>{max(0, dias_restantes)} días</span>", unsafe_allow_html=True)
+            idx_prox = participantes.index(proximo_en_cobrar)
+            fecha_prox = f_inicio_pacto + timedelta(days=idx_prox * salto)
+            dias_restantes = (fecha_prox - date.today()).days
+            
+            st.markdown(f"⏳ El grupo espera el pago en: <span class='days-badge'>{max(0, dias_restantes)} días</span>", unsafe_allow_html=True)
+            st.caption(f"Fecha estimada: **{fecha_prox.strftime('%d de %B')}**")
+            
         st.write("---")
         if not yo['completado']:
             if yo['aviso_pago']:
@@ -181,9 +183,7 @@ elif st.session_state.vista == "dashboard":
 
     if es_admin:
         with t3:
-            # --- CÓDIGO PERMANENTE PARA EL ADMIN ---
             st.subheader("🔑 Acceso para Miembros")
-            st.write("Comparte este código y contraseña con tu grupo:")
             col_cod1, col_cod2 = st.columns(2)
             with col_cod1:
                 st.code(grupo['codigo'], language=None)
@@ -236,7 +236,6 @@ elif st.session_state.vista == "dashboard":
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", u_elim).execute()
                     st.rerun()
 
-            # --- ZONA PELIGROSA ---
             st.write("---")
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             st.subheader("☢️ Zona Peligrosa")
