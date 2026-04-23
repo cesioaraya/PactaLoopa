@@ -38,61 +38,89 @@ st.title("🤝 PactaLoopa")
 if "grupo_id" not in st.session_state:
     st.session_state.grupo_id = None
     st.session_state.nombre_pacto = ""
+    st.session_state.vista = "inicio" # Nueva lógica para controlar la pantalla
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.header("Menú Principal")
-    modo = st.radio("¿Qué deseas hacer?", ["Crear Nuevo Pacto", "Unirse a un Pacto"])
+# --- NAVEGACIÓN ---
+
+# VISTA 1: PANTALLA DE INICIO (Botones principales)
+if st.session_state.vista == "inicio":
+    st.subheader("¿Qué deseas hacer hoy?")
+    col1, col2 = st.columns(2)
     
-    st.divider()
+    with col1:
+        if st.button("✨ Crear Nuevo Pacto"):
+            st.session_state.vista = "crear"
+            st.rerun()
+            
+    with col2:
+        if st.button("🤝 Unirse a un Pacto"):
+            st.session_state.vista = "unirse"
+            st.rerun()
 
-    if modo == "Crear Nuevo Pacto":
-        st.subheader("Configurar Pacto")
-        nombre_pacto_input = st.text_input("Nombre del Pacto", placeholder="Ej. Familia y Amigos")
-        monto = st.number_input("Cuota por persona ($)", min_value=1, value=100)
-        frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
+# VISTA 2: CREAR NUEVO PACTO
+elif st.session_state.vista == "crear":
+    if st.button("⬅️ Volver"):
+        st.session_state.vista = "inicio"
+        st.rerun()
         
-        if st.button("🚀 Crear y Generar Código"):
-            if nombre_pacto_input:
-                try:
-                    codigo_unico = generar_codigo()
-                    data = {
-                        "nombre": nombre_pacto_input,
-                        "monto_cuota": monto,
-                        "frecuencia": frecuencia.lower(),
-                        "codigo": codigo_unico
-                    }
-                    res = supabase.table("grupos").insert(data).execute()
-                    st.session_state.grupo_id = res.data[0]['id']
-                    st.session_state.nombre_pacto = nombre_pacto_input
-                    st.success(f"¡Pacto '{nombre_pacto_input}' creado!")
-                    st.code(codigo_unico, language="text")
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+    st.subheader("Configurar Pacto")
+    nombre_pacto_input = st.text_input("Nombre del Pacto", placeholder="Ej. Familia y Amigos")
+    monto = st.number_input("Cuota por persona ($)", min_value=1, value=100)
+    frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
+    
+    if st.button("🚀 Crear y Generar Código"):
+        if nombre_pacto_input:
+            try:
+                codigo_unico = generar_codigo()
+                data = {
+                    "nombre": nombre_pacto_input,
+                    "monto_cuota": monto,
+                    "frecuencia": frecuencia.lower(),
+                    "codigo": codigo_unico
+                }
+                res = supabase.table("grupos").insert(data).execute()
+                st.session_state.grupo_id = res.data[0]['id']
+                st.session_state.nombre_pacto = nombre_pacto_input
+                st.session_state.vista = "dashboard" # Pasamos al dashboard
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar: {e}")
+        else:
+            st.warning("Por favor, ponle un nombre al pacto.")
+
+# VISTA 3: UNIRSE A PACTO
+elif st.session_state.vista == "unirse":
+    if st.button("⬅️ Volver"):
+        st.session_state.vista = "inicio"
+        st.rerun()
+        
+    st.subheader("Unirse a un Pacto")
+    codigo_input = st.text_input("Introduce el código").upper().strip()
+    tu_nombre = st.text_input("Tu nombre o alias")
+    
+    if st.button("🤝 Unirme al Loop"):
+        if codigo_input and tu_nombre:
+            grupo = supabase.table("grupos").select("*").eq("codigo", codigo_input).execute()
+            if len(grupo.data) > 0:
+                id_g = grupo.data[0]['id']
+                supabase.table("participantes").insert({"grupo_id": id_g, "nombre_usuario": tu_nombre}).execute()
+                st.session_state.grupo_id = id_g
+                st.session_state.nombre_pacto = grupo.data[0]['nombre']
+                st.session_state.vista = "dashboard" # Pasamos al dashboard
+                st.rerun()
             else:
-                st.warning("Por favor, ponle un nombre al pacto.")
-    
-    else:
-        st.subheader("Unirse a un Pacto")
-        codigo_input = st.text_input("Introduce el código").upper().strip()
-        tu_nombre = st.text_input("Tu nombre o alias")
-        
-        if st.button("🤝 Unirme al Loop"):
-            if codigo_input and tu_nombre:
-                grupo = supabase.table("grupos").select("*").eq("codigo", codigo_input).execute()
-                if len(grupo.data) > 0:
-                    id_g = grupo.data[0]['id']
-                    supabase.table("participantes").insert({"grupo_id": id_g, "nombre_usuario": tu_nombre}).execute()
-                    st.session_state.grupo_id = id_g
-                    st.session_state.nombre_pacto = grupo.data[0]['nombre']
-                    st.success(f"¡Unido a {st.session_state.nombre_pacto}!")
-                    st.balloons()
-                else:
-                    st.error("Código no encontrado.")
+                st.error("Código no encontrado.")
 
-# --- CUERPO PRINCIPAL ---
-if st.session_state.grupo_id:
+# VISTA 4: DASHBOARD (Ya estás dentro)
+elif st.session_state.vista == "dashboard":
+    # Sidebar solo aparece cuando ya estamos dentro del pacto
+    with st.sidebar:
+        st.info(f"📍 Pacto: **{st.session_state.nombre_pacto}**")
+        if st.button("🚪 Salir del Pacto"):
+            st.session_state.grupo_id = None
+            st.session_state.vista = "inicio"
+            st.rerun()
+
     st.subheader(f"Pacto: {st.session_state.nombre_pacto}")
     
     # Obtener participantes REALES
@@ -107,7 +135,6 @@ if st.session_state.grupo_id:
         else:
             st.write("### 🏆 Orden de Beneficiarios")
             for idx, p in enumerate(lista_p):
-                # Si ya cobró (completado), le ponemos un check
                 icon = "✅" if p['completado'] else "⏳"
                 st.write(f"{idx+1}. {icon} **{p['nombre_usuario']}**")
 
@@ -116,11 +143,8 @@ if st.session_state.grupo_id:
         if not lista_p:
             st.write("No hay participantes todavía.")
         else:
-            # Diccionario para guardar los nuevos estados de los checkboxes
             nuevos_estados = {}
-            
             for p in lista_p:
-                # El valor inicial del checkbox viene de la base de datos (columna completado)
                 nuevos_estados[p['id']] = st.checkbox(
                     f"Pago recibido de: {p['nombre_usuario']}", 
                     value=p['completado'],
@@ -132,12 +156,9 @@ if st.session_state.grupo_id:
                     for p_id, estado in nuevos_estados.items():
                         supabase.table("participantes").update({"completado": estado}).eq("id", p_id).execute()
                     st.success("¡Base de datos actualizada con éxito!")
-                    st.rerun() # Recarga la app para refrescar la lista de la Tab 1
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Error al actualizar: {e}")
-
-else:
-    st.info("👈 Selecciona 'Crear' o 'Unirse' en el menú lateral para empezar.")
 
 st.markdown("---")
 st.caption("PactaLoopa - Registro transparente para grupos de confianza.")
