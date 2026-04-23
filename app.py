@@ -1,5 +1,21 @@
 import streamlit as st
 import pandas as pd
+import streamlit as st
+from supabase import create_client, Client
+import os
+
+# 1. Conexión segura a Supabase usando los Secretos de GitHub/Streamlit
+try:
+    # Cuando estés en local usará .env, en la web usará los Secrets
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    st.error("Error al conectar con la base de datos. Verifica los Secretos.")
+
+# --- Aquí seguiría el resto de tu código de la interfaz ---
+st.title("🤝 PactaLoopa")
+
 
 # Configuración de la página
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
