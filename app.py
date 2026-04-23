@@ -9,11 +9,13 @@ st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
 @st.cache_resource
 def init_connection():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        # Extraemos y limpiamos: eliminamos espacios y la parte final de la ruta si existe
+        url = st.secrets["SUPABASE_URL"].strip().replace("/rest/v1/", "").rstrip("/")
+        key = st.secrets["SUPABASE_KEY"].strip()
+        
         return create_client(url, key)
     except Exception as e:
-        st.error("No se encontraron los Secretos de Supabase.")
+        st.error(f"Error al conectar: {e}")
         return None
 
 supabase = init_connection()
