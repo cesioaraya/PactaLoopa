@@ -162,3 +162,13 @@ elif st.session_state.vista == "dashboard":
 
 st.markdown("---")
 st.caption("PactaLoopa - Registro transparente para grupos de confianza.")
+# --- PIE DE PÁGINA ---
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center;'>
+    <p>PactaLoopa es una herramienta de uso libre y gratuito.</p>
+    <p>¿Te ha servido? Puedes apoyar el proyecto invitándome a un café en: 
+    <br>
+    <a href='https://buymeacoffee.com/cesioaraya' target='_blank'>buymeacoffee.com/cesioaraya</a></p>
+</div>
+""", unsafe_allow_html=True)
