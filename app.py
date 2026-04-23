@@ -28,6 +28,7 @@ st.markdown("""
     <style>
     .stButton>button { border-radius: 20px; width: 100%; }
     .days-badge { background-color: #e8f0fe; color: #1a73e8; padding: 5px 10px; border-radius: 10px; font-weight: bold; }
+    .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -111,11 +112,18 @@ elif st.session_state.vista == "seleccionar_usuario":
 # --- DASHBOARD PRINCIPAL ---
 elif st.session_state.vista == "dashboard":
     g_res = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
+    if not g_res.data:
+        st.warning("Este pacto ya no existe.")
+        if st.button("Ir al Inicio"):
+            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
+            st.rerun()
+        st.stop()
+        
     grupo = g_res.data[0]
-    
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
     
+    # Identificar admin (primer participante registrado)
     admin_nombre = supabase.table("participantes").select("nombre_usuario").eq("grupo_id", st.session_state.grupo_id).order("id").limit(1).execute().data[0]['nombre_usuario']
     es_admin = (st.session_state.mi_nombre == admin_nombre)
 
@@ -123,7 +131,6 @@ elif st.session_state.vista == "dashboard":
     f_inicio_pacto = date.fromisoformat(grupo['fecha_inicio'])
     salto = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
     
-    # Próximo pago global
     proximo_en_cobrar = next((p for p in participantes if not p['completado']), None)
     dias_restantes = 0
     if proximo_en_cobrar:
@@ -156,10 +163,8 @@ elif st.session_state.vista == "dashboard":
     with t2:
         yo = next(p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre)
         st.subheader(f"Estado de {st.session_state.mi_nombre}")
-        
         if proximo_en_cobrar:
             st.markdown(f"⏳ Próximo pago del grupo en: <span class='days-badge'>{max(0, dias_restantes)} días</span>", unsafe_allow_html=True)
-        
         st.write("---")
         if not yo['completado']:
             if yo['aviso_pago']:
@@ -179,25 +184,20 @@ elif st.session_state.vista == "dashboard":
         with t3:
             st.subheader("Control del Ciclo")
             if st.button("♻️ LIMPIAR TABLERO (Nuevo Ciclo)"):
-                # Reiniciamos estados de todos los participantes
-                supabase.table("participantes").update({
-                    "completado": False, 
-                    "aviso_pago": False
-                }).eq("grupo_id", st.session_state.grupo_id).execute()
-                # Actualizamos la fecha de inicio al día de hoy para que el calendario se mueva
+                supabase.table("participantes").update({"completado": False, "aviso_pago": False}).eq("id", st.session_state.grupo_id).execute()
                 supabase.table("grupos").update({"fecha_inicio": date.today().isoformat()}).eq("id", st.session_state.grupo_id).execute()
-                st.success("Tablero reiniciado para un nuevo ciclo.")
                 st.rerun()
 
             st.write("---")
             estado_insc = "Abiertas" if grupo['abierto'] else "Cerradas"
-            if st.button(f"🚪 {'Cerrar' if grupo['abierto'] else 'Abrir'} Inscripciones (Ahora: {estado_insc})"):
+            if st.button(f"🚪 {'Cerrar' if grupo['abierto'] else 'Abrir'} Inscripciones"):
                 supabase.table("grupos").update({"abierto": not grupo['abierto']}).eq("id", st.session_state.grupo_id).execute()
                 st.rerun()
 
             st.write("---")
             st.subheader("Validar Pagos")
             avisos = [p for p in participantes if p['aviso_pago']]
+            if not avisos: st.caption("Sin reportes pendientes.")
             for a in avisos:
                 if st.button(f"Validar a {a['nombre_usuario']} ✅"):
                     supabase.table("participantes").update({"completado": True, "aviso_pago": False}).eq("id", a['id']).execute()
@@ -221,11 +221,27 @@ elif st.session_state.vista == "dashboard":
             opciones_eliminar = [p['nombre_usuario'] for p in participantes if not p['completado'] and p['nombre_usuario'] != admin_nombre]
             if opciones_eliminar:
                 u_elim = st.selectbox("Seleccionar miembro:", opciones_eliminar)
-                if st.button("🗑️ Eliminar Definitivamente"):
+                if st.button("🗑️ Eliminar Miembro"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", u_elim).execute()
                     st.rerun()
+
+            # --- SECCIÓN RECUPERADA: ELIMINAR GRUPO ---
+            st.write("---")
+            st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
+            st.subheader("☢️ Zona Peligrosa")
+            st.write("Borrar el pacto eliminará a todos los miembros y datos permanentemente.")
+            if st.button("🔥 ELIMINAR ESTE PACTO DEFINITIVAMENTE"):
+                # 1. Borrar participantes asociados
+                supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
+                # 2. Borrar el grupo
+                supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
+                # 3. Limpiar sesión
+                st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
     else:
         with t3:
             st.write(f"**Administrador:** {admin_nombre}")
             st.write(f"**Frecuencia:** {grupo['frecuencia'].capitalize()}")
-            st.write(f"**Fecha de inicio actual:** {f_inicio_pacto.strftime('%d %b %Y')}")
+            st.write(f"**Inicio actual:** {f_inicio_pacto.strftime('%d %b %Y')}")
