@@ -33,13 +33,36 @@ st.markdown("""
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; }
+    .share-box { background-color: #f0f2f6; padding: 20px; border-radius: 10px; border: 2px dashed #1a73e8; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🤝 PactaLoopa")
 
+# Inicializar estados
 if "grupo_id" not in st.session_state:
-    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": ""})
+    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": "", "mostrar_exito": False, "nuevo_codigo": ""})
+
+# --- DIÁLOGO DE ÉXITO (MOSTRAR CÓDIGO) ---
+@st.dialog("🚀 ¡Pacto Creado con Éxito!")
+def mostrar_credenciales_nuevas(codigo, password):
+    st.markdown("### 📢 ¡Comparte esto con tu grupo!")
+    st.write("Para que los demás se unan, dales el código y la contraseña:")
+    
+    st.info("💡 Haz clic en el icono de copiar a la derecha de los cuadros negros.")
+    
+    st.write("**Código del Pacto:**")
+    st.code(codigo, language=None)
+    
+    st.write("**Contraseña:**")
+    st.code(password, language=None)
+    
+    if st.button("Entrar al Dashboard"):
+        st.session_state.mostrar_exito = False
+        st.rerun()
+
+if st.session_state.mostrar_exito:
+    mostrar_credenciales_nuevas(st.session_state.nuevo_codigo, st.session_state.nueva_pass)
 
 # --- NAVEGACIÓN INICIAL ---
 if st.session_state.vista == "inicio":
@@ -72,7 +95,16 @@ elif st.session_state.vista == "crear":
                 "grupo_id": gid, "nombre_usuario": tu_nombre, 
                 "posicion_orden": 0, "pago_cuota": False, "recibio_pozo": False
             }).execute()
-            st.session_state.update({"grupo_id": gid, "mi_nombre": tu_nombre, "vista": "dashboard"})
+            
+            # Guardar para mostrar el mensaje de éxito
+            st.session_state.update({
+                "grupo_id": gid, 
+                "mi_nombre": tu_nombre, 
+                "vista": "dashboard",
+                "mostrar_exito": True,
+                "nuevo_codigo": codigo,
+                "nueva_pass": pass_pacto
+            })
             st.rerun()
 
 elif st.session_state.vista == "unirse":
@@ -124,7 +156,6 @@ elif st.session_state.vista == "dashboard":
     es_admin = (st.session_state.mi_nombre == admin_nombre)
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
 
-    # Sidebar con botón de salir siempre presente
     with st.sidebar:
         st.write(f"### 🛡️ {grupo['nombre']}")
         st.info(f"Usuario: **{st.session_state.mi_nombre}**")
@@ -132,10 +163,9 @@ elif st.session_state.vista == "dashboard":
             st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
             st.rerun()
 
-    # Lógica de Beneficiario
     beneficiario = next((p for p in participantes if not p.get('recibio_pozo', False)), None)
     idx_periodo = participantes.index(beneficiario) if beneficiario else 0
-    salto = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
+    salto = {"semanal": 7, "quincenal": 15, "mensual": 30}.get(grupo['frecuencia'], 30)
     fecha_entrega = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=idx_periodo * salto)
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if es_admin else "ℹ️ Info"])
@@ -183,17 +213,22 @@ elif st.session_state.vista == "dashboard":
 
     with t3:
         if es_admin:
-            st.subheader("🔑 Credenciales")
+            st.subheader("🔑 Credenciales de Acceso")
+            st.write("Comparte estos datos con los miembros:")
             col_c1, col_c2 = st.columns(2)
-            col_c1.code(grupo['codigo'], language=None); col_c1.caption("Código")
-            col_c2.code(grupo['password'], language=None); col_c2.caption("Contraseña")
+            with col_c1:
+                st.write("**Código**")
+                st.code(grupo['codigo'], language=None)
+            with col_c2:
+                st.write("**Contraseña**")
+                st.code(grupo['password'], language=None)
 
             st.write("---")
             st.subheader("✅ Validar Cuotas")
             avisos = [p for p in participantes if p.get('aviso_pago')]
-            if not avisos: st.caption("No hay pagos pendientes por validar.")
+            if not avisos: st.caption("No hay pagos pendientes.")
             for a in avisos:
-                if st.button(f"Validar pago de {a['nombre_usuario']} ✅"):
+                if st.button(f"Confirmar pago de {a['nombre_usuario']} ($ {grupo['monto_cuota']})"):
                     supabase.table("participantes").update({"aviso_pago": False, "pago_cuota": True}).eq("id", a['id']).execute()
                     st.rerun()
 
@@ -206,13 +241,13 @@ elif st.session_state.vista == "dashboard":
                         supabase.table("participantes").update({"recibio_pozo": True}).eq("id", beneficiario['id']).execute()
                         supabase.table("participantes").update({"pago_cuota": False, "aviso_pago": False}).eq("grupo_id", st.session_state.grupo_id).execute()
                         st.rerun()
-                else: st.warning("Faltan miembros por pagar cuota.")
+                else: st.warning("Aún faltan miembros por pagar.")
 
             st.write("---")
             st.subheader("🔄 Organizar Loop")
             nombres_p = [p['nombre_usuario'] for p in participantes]
-            nuevo_orden = st.multiselect("Cambiar orden (arrastra o selecciona):", nombres_p, default=nombres_p)
-            if st.button("💾 Guardar Nuevo Orden"):
+            nuevo_orden = st.multiselect("Cambiar orden:", nombres_p, default=nombres_p)
+            if st.button("💾 Guardar Orden"):
                 for idx, nombre in enumerate(nuevo_orden):
                     supabase.table("participantes").update({"posicion_orden": idx}).eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", nombre).execute()
                 st.rerun()
@@ -222,20 +257,20 @@ elif st.session_state.vista == "dashboard":
             opciones_eliminar = [p['nombre_usuario'] for p in participantes if p['nombre_usuario'] != admin_nombre]
             if opciones_eliminar:
                 u_elim = st.selectbox("Eliminar a:", opciones_eliminar)
-                if st.button("Eliminar Miembro Seleccionado"):
+                if st.button("Eliminar Miembro"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", u_elim).execute()
                     st.rerun()
 
             st.write("---")
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             st.subheader("☢️ Zona Peligrosa")
-            if st.button("🔥 ELIMINAR TODO ESTE PACTO"):
+            if st.button("🔥 ELIMINAR TODO EL PACTO"):
                 supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
                 supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
                 st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.write(f"**Administrador:** {admin_nombre}")
-            st.write(f"**Frecuencia:** {grupo['frecuencia'].capitalize()}")
-            st.write(f"**Inicio:** {date.fromisoformat(grupo['fecha_inicio']).strftime('%d %b %Y')}")
+            st.write(f"**Admin:** {admin_nombre}")
+            st.write(f"**Frecuencia:** {grupo['frecuencia']}")
+            st.write(f"**Inicio:** {grupo['fecha_inicio']}")
