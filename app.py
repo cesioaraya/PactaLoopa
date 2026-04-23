@@ -14,8 +14,6 @@ except Exception as e:
     st.error("Error al conectar con la base de datos. Verifica los Secretos.")
 
 # --- Aquí seguiría el resto de tu código de la interfaz ---
-st.title("🤝 PactaLoopa")
-
 
 # Configuración de la página
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
