@@ -35,7 +35,6 @@ st.markdown("""
 st.title("🤝 PactaLoopa")
 
 # --- LÓGICA DE ESTADO ---
-# Guardamos el grupo actual en la sesión para que no se pierda al recargar
 if "grupo_id" not in st.session_state:
     st.session_state.grupo_id = None
     st.session_state.nombre_pacto = ""
@@ -96,42 +95,49 @@ with st.sidebar:
 if st.session_state.grupo_id:
     st.subheader(f"Pacto: {st.session_state.nombre_pacto}")
     
-    # Obtener participantes REALES de la base de datos
-    participantes_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
+    # Obtener participantes REALES
+    participantes_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("id").execute()
     lista_p = participantes_db.data
 
     tab1, tab2 = st.tabs(["🔄 El Loop Actual", "📋 Gestión de Pagos"])
 
     with tab1:
         if not lista_p:
-            st.info("Esperando a que se unan participantes...")
+            st.info("Esperando participantes... comparte el código con tu grupo.")
         else:
-            st.write(f"### 🏆 Turno actual")
-            # Lógica simple: el primero que se unió es el primero en cobrar (por ahora)
-            ganador = lista_p[0]['nombre_usuario']
-            st.success(f"🌟 **{ganador}** es quien recibe el pozo en esta ronda.")
-            st.write("---")
-            st.write("**Orden de turnos:**")
+            st.write("### 🏆 Orden de Beneficiarios")
             for idx, p in enumerate(lista_p):
-                st.write(f"{idx+1}. {p['nombre_usuario']}")
+                # Si ya cobró (completado), le ponemos un check
+                icon = "✅" if p['completado'] else "⏳"
+                st.write(f"{idx+1}. {icon} **{p['nombre_usuario']}**")
 
     with tab2:
         st.write("### ✅ Confirmar Pagos")
         if not lista_p:
             st.write("No hay participantes todavía.")
         else:
-            for p in lista_p:
-                # Cada checkbox es real para cada usuario en la DB
-                st.checkbox(f"Pago de {p['nombre_usuario']}", key=f"db_pago_{p['id']}")
+            # Diccionario para guardar los nuevos estados de los checkboxes
+            nuevos_estados = {}
             
-            if st.button("Guardar progreso"):
-                st.toast("¡Estado de pagos actualizado!")
+            for p in lista_p:
+                # El valor inicial del checkbox viene de la base de datos (columna completado)
+                nuevos_estados[p['id']] = st.checkbox(
+                    f"Pago recibido de: {p['nombre_usuario']}", 
+                    value=p['completado'],
+                    key=f"pago_id_{p['id']}"
+                )
+            
+            if st.button("💾 Guardar Cambios en la Nube"):
+                try:
+                    for p_id, estado in nuevos_estados.items():
+                        supabase.table("participantes").update({"completado": estado}).eq("id", p_id).execute()
+                    st.success("¡Base de datos actualizada con éxito!")
+                    st.rerun() # Recarga la app para refrescar la lista de la Tab 1
+                except Exception as e:
+                    st.error(f"Error al actualizar: {e}")
 
 else:
     st.info("👈 Selecciona 'Crear' o 'Unirse' en el menú lateral para empezar.")
 
 st.markdown("---")
-st.caption("PactaLoopa - Ahorro comunitario simplificado.")
-
-st.markdown("---")
-st.caption("PactaLoopa no gestiona dinero. Los pagos se realizan de forma externa.")
+st.caption("PactaLoopa - Registro transparente para grupos de confianza.")
