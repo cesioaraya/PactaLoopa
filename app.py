@@ -23,20 +23,10 @@ supabase = init_connection()
 def generar_codigo():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-def calcular_fecha_base(dia_inicio):
-    hoy = date.today()
-    if hoy.day <= dia_inicio:
-        return date(hoy.year, hoy.month, dia_inicio)
-    else:
-        if hoy.month == 12:
-            return date(hoy.year + 1, 1, dia_inicio)
-        return date(hoy.year, hoy.month + 1, dia_inicio)
-
 # 3. ESTILO
 st.markdown("""
     <style>
     .stButton>button { border-radius: 20px; width: 100%; }
-    .catch-up { background-color: #fff3cd; padding: 15px; border-radius: 10px; border: 1px solid #ffeeba; margin-bottom: 10px; }
     .days-badge { background-color: #e8f0fe; color: #1a73e8; padding: 5px 10px; border-radius: 10px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
@@ -62,7 +52,7 @@ elif st.session_state.vista == "crear":
     nombre_pacto = st.text_input("Nombre del Pacto")
     monto = st.number_input("Cuota ($)", min_value=1, value=100)
     frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
-    dia_inicio = st.number_input("Día de pago base (1-28)", min_value=1, max_value=28, value=1)
+    fecha_inicio = st.date_input("¿Cuándo inicia el primer pago?", value=date.today())
     pass_pacto = st.text_input("Contraseña", type="password")
     tu_nombre = st.text_input("Tu nombre (Admin)").strip()
     
@@ -73,7 +63,7 @@ elif st.session_state.vista == "crear":
                 "nombre": nombre_pacto, 
                 "monto_cuota": monto, 
                 "frecuencia": frecuencia.lower(), 
-                "dia_inicio": dia_inicio,
+                "fecha_inicio": fecha_inicio.isoformat(),
                 "codigo": codigo, 
                 "password": pass_pacto,
                 "abierto": True
@@ -97,7 +87,7 @@ elif st.session_state.vista == "unirse":
 elif st.session_state.vista == "seleccionar_usuario":
     p_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
     g_db = supabase.table("grupos").select("abierto").eq("id", st.session_state.grupo_id).execute()
-    grupo_abierto = g_db.data[0]['abierto']
+    grupo_abierto = g_db.data[0].get('abierto', True)
     
     nombres = [p['nombre_usuario'] for p in p_db.data]
     opciones = ["-- Seleccionar --"]
@@ -130,16 +120,15 @@ elif st.session_state.vista == "dashboard":
     es_admin = (st.session_state.mi_nombre == admin_nombre)
 
     # Lógica de fechas
-    dia_c = grupo.get('dia_inicio', 1)
-    f_pago_inicial = calcular_fecha_base(dia_c)
+    f_inicio_pacto = date.fromisoformat(grupo['fecha_inicio'])
     salto = {"semanal": 7, "quincenal": 15, "mensual": 30}[grupo['frecuencia']]
     
-    # Próximo pago global (el primero que no ha completado)
+    # Próximo pago global
     proximo_en_cobrar = next((p for p in participantes if not p['completado']), None)
     dias_restantes = 0
     if proximo_en_cobrar:
         idx_prox = participantes.index(proximo_en_cobrar)
-        fecha_prox = f_pago_inicial + timedelta(days=idx_prox * salto)
+        fecha_prox = f_inicio_pacto + timedelta(days=idx_prox * salto)
         dias_restantes = (fecha_prox - date.today()).days
 
     with st.sidebar:
@@ -154,7 +143,7 @@ elif st.session_state.vista == "dashboard":
     with t1:
         st.subheader("Cronograma de Pagos")
         for i, p in enumerate(participantes):
-            f_pago = f_pago_inicial + timedelta(days=i * salto)
+            f_pago = f_inicio_pacto + timedelta(days=i * salto)
             col_a, col_b = st.columns([3, 1])
             with col_a:
                 st.write(f"**{i+1}. {p['nombre_usuario']}**")
@@ -188,9 +177,19 @@ elif st.session_state.vista == "dashboard":
 
     if es_admin:
         with t3:
-            st.subheader("Panel de Control")
-            
-            # Control de Ingresos
+            st.subheader("Control del Ciclo")
+            if st.button("♻️ LIMPIAR TABLERO (Nuevo Ciclo)"):
+                # Reiniciamos estados de todos los participantes
+                supabase.table("participantes").update({
+                    "completado": False, 
+                    "aviso_pago": False
+                }).eq("grupo_id", st.session_state.grupo_id).execute()
+                # Actualizamos la fecha de inicio al día de hoy para que el calendario se mueva
+                supabase.table("grupos").update({"fecha_inicio": date.today().isoformat()}).eq("id", st.session_state.grupo_id).execute()
+                st.success("Tablero reiniciado para un nuevo ciclo.")
+                st.rerun()
+
+            st.write("---")
             estado_insc = "Abiertas" if grupo['abierto'] else "Cerradas"
             if st.button(f"🚪 {'Cerrar' if grupo['abierto'] else 'Abrir'} Inscripciones (Ahora: {estado_insc})"):
                 supabase.table("grupos").update({"abierto": not grupo['abierto']}).eq("id", st.session_state.grupo_id).execute()
@@ -199,7 +198,6 @@ elif st.session_state.vista == "dashboard":
             st.write("---")
             st.subheader("Validar Pagos")
             avisos = [p for p in participantes if p['aviso_pago']]
-            if not avisos: st.caption("No hay pagos pendientes de validación.")
             for a in avisos:
                 if st.button(f"Validar a {a['nombre_usuario']} ✅"):
                     supabase.table("participantes").update({"completado": True, "aviso_pago": False}).eq("id", a['id']).execute()
@@ -207,11 +205,10 @@ elif st.session_state.vista == "dashboard":
             
             st.write("---")
             st.subheader("Organizar Loop")
-            # Reordenar solo los pendientes
             pendientes = [p for p in participantes if not p['completado']]
             if len(pendientes) > 1:
                 nombres_p = [p['nombre_usuario'] for p in pendientes]
-                nuevo_orden = st.multiselect("Reordenar los que faltan por cobrar:", nombres_p, default=nombres_p)
+                nuevo_orden = st.multiselect("Reordenar los que faltan:", nombres_p, default=nombres_p)
                 if st.button("💾 Guardar Orden"):
                     completados = [p for p in participantes if p['completado']]
                     final = completados + [next(p for p in pendientes if p['nombre_usuario'] == n) for n in nuevo_orden]
@@ -221,22 +218,14 @@ elif st.session_state.vista == "dashboard":
 
             st.write("---")
             st.subheader("Eliminar Miembros")
-            # Solo permite eliminar a quienes NO han completado (y que no sea el admin mismo en este contexto simplificado)
             opciones_eliminar = [p['nombre_usuario'] for p in participantes if not p['completado'] and p['nombre_usuario'] != admin_nombre]
-            
             if opciones_eliminar:
-                u_elim = st.selectbox("Seleccionar miembro (solo pendientes):", opciones_eliminar)
-                if st.button("🗑️ Confirmar Eliminación"):
+                u_elim = st.selectbox("Seleccionar miembro:", opciones_eliminar)
+                if st.button("🗑️ Eliminar Definitivamente"):
                     supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).eq("nombre_usuario", u_elim).execute()
-                    # Re-ordenar posiciones
-                    restantes = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute().data
-                    for i, r in enumerate(restantes):
-                        supabase.table("participantes").update({"posicion_orden": i}).eq("id", r['id']).execute()
                     st.rerun()
-            else:
-                st.caption("No hay miembros eliminables (todos cobraron o solo queda el admin).")
     else:
         with t3:
             st.write(f"**Administrador:** {admin_nombre}")
             st.write(f"**Frecuencia:** {grupo['frecuencia'].capitalize()}")
-            st.write(f"**Día base:** {dia_c}")
+            st.write(f"**Fecha de inicio actual:** {f_inicio_pacto.strftime('%d %b %Y')}")
