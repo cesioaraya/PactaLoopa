@@ -1,7 +1,6 @@
 # # 🤝 PactaLoopa
 
-**PactaLoopa** es una aplicación web liviana para la gestión de ahorros comunitarios (cadenas, tandas, rondas). 
-Permite a los usuarios organizar turnos y llevar un control contable de los pagos de forma simple y transparente.
+**PactaLoopa** es una aplicación web liviana para la gestión de ahorros comunitarios.
 
 ## 🚀 Características
 - Configuración de monto y frecuencia.
