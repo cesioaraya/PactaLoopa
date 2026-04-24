@@ -23,6 +23,26 @@ supabase = init_connection()
 def generar_codigo():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+def calcular_fecha_periodo(fecha_inicio, indice, frecuencia):
+    """Calcula la fecha exacta del periodo ajustándose a meses si es mensual."""
+    if frecuencia == "mensual":
+        # Lógica para mantener el mismo día del mes
+        meses = (fecha_inicio.month + indice - 1) % 12 + 1
+        anios = fecha_inicio.year + (fecha_inicio.month + indice - 1) // 12
+        # Intentamos mantener el día, si el mes tiene menos días (ej. 31 de feb), ajusta al último día
+        dia = fecha_inicio.day
+        try:
+            return date(anios, meses, dia)
+        except ValueError:
+            # Caso 31 de febrero -> devuelve 28 o 29 de febrero
+            import calendar
+            ultimo_dia = calendar.monthrange(anios, meses)[1]
+            return date(anios, meses, ultimo_dia)
+    elif frecuencia == "quincenal":
+        return fecha_inicio + timedelta(days=indice * 15)
+    else:  # semanal
+        return fecha_inicio + timedelta(days=indice * 7)
+
 # 3. ESTILO
 st.markdown("""
     <style>
@@ -140,8 +160,7 @@ elif st.session_state.vista == "dashboard":
     es_admin = (st.session_state.mi_nombre == admin_nombre)
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
 
-    # Lógica de periodos para el Sidebar
-    salto = {"semanal": 7, "quincenal": 15, "mensual": 30}.get(grupo['frecuencia'], 30)
+    f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
     
     with st.sidebar:
         st.write(f"### 🛡️ {grupo['nombre']}")
@@ -153,7 +172,7 @@ elif st.session_state.vista == "dashboard":
         st.divider()
         st.write("📅 **Periodos del Loop**")
         for i, p in enumerate(participantes):
-            f_p = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=i * salto)
+            f_p = calcular_fecha_periodo(f_inicio_dt, i, grupo['frecuencia'])
             label = f"P{i+1}: {p['nombre_usuario']} ({f_p.strftime('%d/%m')})"
             if st.button(label, key=f"per_{i}"):
                 st.session_state.periodo_seleccionado = i
@@ -161,7 +180,7 @@ elif st.session_state.vista == "dashboard":
     # El periodo visualizado depende de la selección del sidebar
     idx_p = st.session_state.periodo_seleccionado
     beneficiario_p = participantes[idx_p] if idx_p < len(participantes) else participantes[0]
-    fecha_p = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=idx_p * salto)
+    fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Reportar Pago", "⚙️ Admin" if es_admin else "ℹ️ Info"])
 
@@ -181,8 +200,6 @@ elif st.session_state.vista == "dashboard":
             with col_p:
                 if p == beneficiario_p: st.caption("Beneficiario")
                 else:
-                    # Nota: En una versión real, los pagos deberían estar en una tabla separada por periodo. 
-                    # Aquí mantenemos la estructura simple solicitada.
                     status = "PAGADO" if p.get('pago_cuota') else "PENDIENTE"
                     clase = "pago-si" if p.get('pago_cuota') else "pago-no"
                     st.markdown(f"<span class='status-badge {clase}'>{status}</span>", unsafe_allow_html=True)
@@ -209,8 +226,6 @@ elif st.session_state.vista == "dashboard":
     with t3:
         if es_admin:
             st.subheader("Gestión de Miembros")
-            
-            # Reordenar Miembros
             st.write("---")
             st.write("📋 **Cambiar orden (solo quienes no han recibido pozo)**")
             pendientes = [p for p in participantes if not p.get('recibio_pozo')]
@@ -222,7 +237,6 @@ elif st.session_state.vista == "dashboard":
                     supabase.table("participantes").update({"posicion_orden": pos_nueva}).eq("id", p_obj['id']).execute()
                     st.rerun()
 
-            # Eliminar Miembros
             st.write("---")
             st.write("❌ **Eliminar Miembro**")
             to_del = st.selectbox("Seleccionar para eliminar:", [p['nombre_usuario'] for p in participantes if p['nombre_usuario'] != st.session_state.mi_nombre])
@@ -231,7 +245,6 @@ elif st.session_state.vista == "dashboard":
                 supabase.table("participantes").delete().eq("id", p_del['id']).execute()
                 st.rerun()
 
-            # Validar Pagos
             st.write("---")
             st.subheader("✅ Validar Cuotas Reportadas")
             avisos = [p for p in participantes if p.get('aviso_pago')]
@@ -242,7 +255,6 @@ elif st.session_state.vista == "dashboard":
                         st.rerun()
             else: st.caption("No hay pagos pendientes de validación.")
 
-            # Eliminar Loop
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             st.subheader("🗑️ Zona de Peligro")
             if st.button("ELIMINAR TODO EL LOOP"):
