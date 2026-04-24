@@ -129,7 +129,6 @@ elif st.session_state.vista == "seleccionar_usuario":
     g_db = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     grupo = g_db.data[0]
     nombres = [p['nombre_usuario'] for p in p_db.data]
-    # FIX: Identificar admin por ID menor (creador), no por posición actual
     admin_data = min(p_db.data, key=lambda x: x['id']) if p_db.data else None
     admin_nombre = admin_data['nombre_usuario'] if admin_data else ""
 
@@ -163,7 +162,6 @@ elif st.session_state.vista == "dashboard":
     grupo = g_res.data[0]
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
-    # FIX: Identificar admin por ID menor (creador), no por posición actual
     admin_data = min(participantes, key=lambda x: x['id']) if participantes else None
     admin_nombre = admin_data['nombre_usuario'] if admin_data else ""
     es_admin = (st.session_state.mi_nombre == admin_nombre)
@@ -223,13 +221,25 @@ elif st.session_state.vista == "dashboard":
                 pagado = ha_pagado_periodo(yo, idx_p)
                 avisado = ha_avisado_periodo(yo, idx_p)
                 
-                if pagado: st.success("✅ Tu cuota ya está marcada como pagada para este periodo.")
+                # --- LÓGICA DE BLOQUEO DE PERIODOS FUTUROS ---
+                hoy = date.today()
+                # Calculamos el último día del mes actual para permitir reportar hasta el final del mes vigente
+                import calendar
+                ultimo_dia_mes_actual = date(hoy.year, hoy.month, calendar.monthrange(hoy.year, hoy.month)[1])
+                es_futuro = fecha_p > ultimo_dia_mes_actual
+                # ---------------------------------------------
+
+                if pagado: 
+                    st.success("✅ Tu cuota ya está marcada como pagada para este periodo.")
                 elif avisado:
                     st.warning("🔔 Pago reportado. Esperando validación.")
                     if st.button("Cancelar Reporte"):
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
                         if str(idx_p) in avisos: avisos.remove(str(idx_p))
                         supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
+                elif es_futuro:
+                    st.info(f"📅 El reporte para este periodo se activará en **{fecha_p.strftime('%B')}**.")
+                    st.button("📢 INFORMAR QUE YA PAGUÉ", disabled=True, help="No puedes reportar pagos de meses futuros.")
                 else:
                     st.info(f"Monto: **${grupo['monto_cuota']}**")
                     if st.button("📢 INFORMAR QUE YA PAGUÉ"):
