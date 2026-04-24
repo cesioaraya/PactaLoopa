@@ -61,7 +61,18 @@ st.markdown("""
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
-    /* Estilo para que el radio se vea más limpio */
+    
+    /* Barra de usuario superior */
+    .user-bar {
+        background-color: #f1f3f4;
+        padding: 8px 15px;
+        border-radius: 30px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
     div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -99,7 +110,7 @@ if st.session_state.vista == "inicio":
         if st.button("🤝 Entrar a un Pacto"): st.session_state.vista = "unirse"; st.rerun()
 
 elif st.session_state.vista == "crear":
-    if st.button("⬅️"): st.session_state.vista = "inicio"; st.rerun()
+    if st.button("⬅️ Volver"): st.session_state.vista = "inicio"; st.rerun()
     nombre = st.text_input("Nombre del Pacto")
     monto = st.number_input("Cuota ($)", min_value=1, value=100)
     frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
@@ -107,7 +118,7 @@ elif st.session_state.vista == "crear":
     pwd = st.text_input("Pass Admin", type="password")
     admin_n = st.text_input("Tu nombre").strip()
     
-    if st.button("Crear"):
+    if st.button("Crear Pacto"):
         if nombre and admin_n and pwd:
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
@@ -117,14 +128,14 @@ elif st.session_state.vista == "crear":
             st.rerun()
 
 elif st.session_state.vista == "unirse":
-    if st.button("⬅️"): st.session_state.vista = "inicio"; st.rerun()
-    c_in = st.text_input("Código").upper().strip()
-    if st.button("Buscar"):
+    if st.button("⬅️ Volver"): st.session_state.vista = "inicio"; st.rerun()
+    c_in = st.text_input("Código del Pacto").upper().strip()
+    if st.button("Buscar Pacto"):
         g = supabase.table("grupos").select("*").eq("codigo", c_in).execute()
         if g.data:
             st.session_state.grupo_id = g.data[0]['id']
             st.session_state.vista = "seleccionar_usuario"; st.rerun()
-        else: st.error("No existe.")
+        else: st.error("No se encontró ningún pacto con ese código.")
 
 elif st.session_state.vista == "seleccionar_usuario":
     p_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
@@ -134,13 +145,13 @@ elif st.session_state.vista == "seleccionar_usuario":
     
     sel = st.selectbox("¿Quién eres?", ["-- Seleccionar --", "-- Nuevo Miembro --"] + nombres)
     if sel == "-- Nuevo Miembro --":
-        n = st.text_input("Nombre").strip()
+        n = st.text_input("Tu nombre").strip()
         if st.button("Unirme") and n:
             max_p = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
             supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": n, "posicion_orden": max_p + 1}).execute()
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
     elif sel != "-- Seleccionar --":
-        p_check = st.text_input("Pass Admin (Opcional)", type="password")
+        p_check = st.text_input("Pass Admin (Opcional)", type="password", help="Solo si eres el administrador")
         if st.button("Entrar"):
             is_adm = (p_check == grupo['password'])
             st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": is_adm}); st.rerun()
@@ -158,6 +169,16 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
+    # BARRA DE USUARIO INTEGRADA (Reemplaza al sidebar)
+    ucol1, ucol2 = st.columns([3, 1])
+    ucol1.markdown(f"**👤 Usuario:** {st.session_state.mi_nombre} {' (Admin)' if st.session_state.es_admin else ''}")
+    if ucol2.button("🚪 Salir", key="logout_btn", help="Cerrar sesión"):
+        st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None})
+        st.rerun()
+    
+    st.markdown("---")
+    st.write(f"### 🛡️ {grupo['nombre']}")
+
     # SELECCIÓN AUTOMÁTICA AL INICIO
     hoy = date.today()
     if st.session_state.periodo_seleccionado is None:
@@ -170,20 +191,13 @@ elif st.session_state.vista == "dashboard":
                 menor_dif = dif
                 mejor_idx = i
         st.session_state.periodo_seleccionado = mejor_idx
-
-    with st.sidebar:
-        st.write(f"### 👤 {st.session_state.mi_nombre}")
-        if st.button("🚪 Salir"):
-            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None}); st.rerun()
-
-    st.write(f"### 🛡️ {grupo['nombre']}")
     
     opciones = [f"P{i+1}: {p['nombre_usuario']}" for i, p in enumerate(participantes)]
     if not opciones:
         st.info("Esperando a que se unan miembros...")
         st.stop()
     
-    # --- SELECTOR DE PERIODO PROTEGIDO (No editable por teclado) ---
+    # --- SELECTOR DE PERIODO PROTEGIDO ---
     with st.expander(f"📅 Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
         idx_p = st.radio(
             "Selecciona un periodo:",
@@ -241,7 +255,7 @@ elif st.session_state.vista == "dashboard":
 
     with t3:
         if st.session_state.es_admin:
-            st.subheader("Validar Pagos del Periodo")
+            st.subheader("Validar Pagos")
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
             if not pendientes: st.info("Sin avisos pendientes en este periodo.")
             for p in pendientes:
@@ -270,7 +284,7 @@ elif st.session_state.vista == "dashboard":
                     st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
-            if st.button("🗑️ ELIMINAR TODO EL PACTO", type="secondary"):
+            if st.button("🗑️ ELIMINAR TODO EL PACTO"):
                 confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
             st.markdown('</div>', unsafe_allow_html=True)
         else:
