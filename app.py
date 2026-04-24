@@ -21,9 +21,6 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- LÓGICA DE PERSISTENCIA (Sustituye cookies si no hay componente extra) ---
-# Nota: Streamlit mantiene el session_state mientras la pestaña no se cierre. 
-# Para persistencia real entre cierres de navegador se usaría st.cookies (requiere instalación extra)
 if "grupo_id" not in st.session_state:
     st.session_state.update({
         "grupo_id": None, 
@@ -78,18 +75,16 @@ def mostrar_exito(codigo, password):
 
 @st.dialog("⚠️ ELIMINAR TODO EL LOOP")
 def confirmar_borrado_total(grupo_id, pass_real):
-    st.warning("Esta acción es irreversible. Se borrarán todos los miembros y registros de pago.")
+    st.warning("Esta acción es irreversible.")
     confirmacion = st.text_input("Escribe 'ELIMINAR' para confirmar")
     pass_check = st.text_input("Contraseña de Administrador", type="password")
-    
     if st.button("Confirmar Destrucción Total", type="primary"):
         if confirmacion == "ELIMINAR" and pass_check == pass_real:
             supabase.table("participantes").delete().eq("grupo_id", grupo_id).execute()
             supabase.table("grupos").delete().eq("id", grupo_id).execute()
             st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
             st.rerun()
-        else:
-            st.error("Validación incorrecta.")
+        else: st.error("Validación incorrecta.")
 
 # --- NAVEGACIÓN ---
 st.title("🤝 PactaLoopa")
@@ -115,7 +110,8 @@ elif st.session_state.vista == "crear":
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
             gid = res.data[0]['id']
-            supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 0}).execute()
+            # Se asigna posición 999 para que el admin sea el último por defecto, pero se puede editar después
+            supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 999}).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": admin_n, "vista": "dashboard", "nuevo_codigo": cod, "nueva_pass": pwd, "mostrar_exito": True, "es_admin": True})
             st.rerun()
 
@@ -134,26 +130,24 @@ elif st.session_state.vista == "seleccionar_usuario":
     g_db = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     grupo = g_db.data[0]
     nombres = [p['nombre_usuario'] for p in p_db.data]
-    admin_n = min(p_db.data, key=lambda x: x['id'])['nombre_usuario']
-
-    sel = st.selectbox("¿Quién eres?", ["-- Seleccionar --", "-- Nuevo Miembro --"] + nombres)
     
+    # El admin es quien conoce la contraseña, lo identificamos por la tabla grupos
+    sel = st.selectbox("¿Quién eres?", ["-- Seleccionar --", "-- Nuevo Miembro --"] + nombres)
     if sel == "-- Nuevo Miembro --":
         n = st.text_input("Nombre").strip()
         if st.button("Unirme") and n:
             max_p = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
+            # Los nuevos se agregan después del último, el admin seguirá estando al final si su posición es 999
             supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": n, "posicion_orden": max_p + 1}).execute()
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
     elif sel != "-- Seleccionar --":
-        if sel == admin_n:
-            p_check = st.text_input("Pass Admin", type="password")
-            if st.button("Entrar"):
-                if p_check == grupo['password']:
-                    st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": True}); st.rerun()
-                else: st.error("Mal password")
-        else:
-            if st.button(f"Entrar como {sel}"):
+        p_check = st.text_input("Pass Admin (Solo si eres el creador)", type="password")
+        if st.button("Entrar"):
+            if p_check == grupo['password']:
+                st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": True}); st.rerun()
+            elif not p_check:
                 st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": False}); st.rerun()
+            else: st.error("Contraseña incorrecta.")
 
 # --- DASHBOARD ---
 elif st.session_state.vista == "dashboard":
@@ -163,38 +157,49 @@ elif st.session_state.vista == "dashboard":
     g_res = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     if not g_res.data: st.session_state.update({"grupo_id": None, "vista": "inicio"}); st.rerun()
     grupo = g_res.data[0]
+    
+    # Obtenemos participantes ordenados
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
+    f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
     with st.sidebar:
         st.write(f"### 👤 {st.session_state.mi_nombre}")
         if st.button("🚪 Salir"):
-            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"}); st.rerun()
+            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None}); st.rerun()
 
     st.write(f"### 🛡️ {grupo['nombre']}")
     
-    # --- BLOQUE CORREGIDO PARA EVITAR EL ERROR ---
     opciones = [f"P{i+1}: {p['nombre_usuario']}" for i, p in enumerate(participantes)]
-    
-    # 1. Si no hay participantes, detenemos la ejecución para evitar que selectbox falle
     if not opciones:
         st.info("Esperando a que se unan miembros...")
         st.stop()
         
-    # 2. Validamos que el índice guardado esté dentro del rango actual de participantes
-    if st.session_state.periodo_seleccionado is None or st.session_state.periodo_seleccionado >= len(opciones):
+    if st.session_state.periodo_seleccionado is None:
         st.session_state.periodo_seleccionado = 0
+
+    st.session_state.periodo_seleccionado = min(st.session_state.periodo_seleccionado, len(opciones)-1)
     
-    idx_p = st.selectbox("Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
+    idx_p = st.selectbox("Seleccionar Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
     st.session_state.periodo_seleccionado = idx_p
-    # ---------------------------------------------
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if st.session_state.es_admin else "ℹ️ Info"])
 
     with t1:
         benef = participantes[idx_p]
-        st.info(f"🎁 Recibe: **{benef['nombre_usuario']}**")
+        fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
+        dias_restantes = (fecha_p - date.today()).days
+        txt_restantes = f"{dias_restantes} días" if dias_restantes > 0 else "¡Hoy!" if dias_restantes == 0 else "Finalizado"
+
+        st.markdown(f"""
+        <div class="info-card">
+            👤 <b>Recibe Pozo:</b> {benef['nombre_usuario']}<br>
+            🗓️ <b>Fecha Estimada:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
+            ⏳ <b>Faltan:</b> {txt_restantes}<br>
+        </div>
+        """, unsafe_allow_html=True)
+
         for p in participantes:
             col_a, col_b = st.columns([3, 1])
             col_a.write(f"{'🎁' if p == benef else '👤'} {p['nombre_usuario']}")
@@ -212,30 +217,31 @@ elif st.session_state.vista == "dashboard":
                 else:
                     if st.button("📢 YA PAGUÉ"):
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
-                        avisos.append(str(idx_p))
-                        supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
+                        if str(idx_p) not in avisos:
+                            avisos.append(str(idx_p))
+                            supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
 
     with t3:
         if st.session_state.es_admin:
-            # Control de pagos
             st.subheader("Validar Pagos")
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
             for p in pendientes:
-                if st.button(f"Confirmar {p['nombre_usuario']}"):
+                if st.button(f"Confirmar pago de {p['nombre_usuario']}"):
                     avisos = str(p.get('periodos_avisados', "")).split(",")
                     pagos = str(p.get('periodos_pagados', "")).split(",")
                     if str(idx_p) in avisos: avisos.remove(str(idx_p))
-                    pagos.append(str(idx_p))
+                    if str(idx_p) not in pagos: pagos.append(str(idx_p))
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
-            st.subheader("Miembros")
+            st.subheader("Miembros (Orden de cobro)")
             for i, p in enumerate(participantes):
                 with st.container():
                     st.markdown('<div class="member-card">', unsafe_allow_html=True)
                     st.write(f"{i+1}. {p['nombre_usuario']}")
                     c1, c2, c3 = st.columns(3)
                     if i > 0 and c1.button("↑", key=f"u{p['id']}"):
+                        # Al intercambiar, usamos los valores de i actuales para normalizar las posiciones
                         supabase.table("participantes").update({"posicion_orden": i-1}).eq("id", p['id']).execute()
                         supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i-1]['id']).execute(); st.rerun()
                     if i < len(participantes)-1 and c2.button("↓", key=f"d{p['id']}"):
@@ -250,5 +256,6 @@ elif st.session_state.vista == "dashboard":
                 confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
             st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.write(f"Código: **{grupo['codigo']}**")
-            st.write(f"Cuota: **${grupo['monto_cuota']}**")
+            st.subheader("ℹ️ Info del Pacto")
+            st.write(f"**Código:** {grupo['codigo']}")
+            st.write(f"**Cuota:** ${grupo['monto_cuota']}")
