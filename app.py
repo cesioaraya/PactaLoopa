@@ -53,6 +53,7 @@ st.markdown("""
     <style>
     .stButton>button { border-radius: 20px; width: 100%; }
     .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
+    .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
     .status-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
@@ -168,7 +169,6 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
     
-    # --- DETERMINAR PERIODO ACTUAL POR DEFECTO ---
     if st.session_state.periodo_seleccionado is None:
         hoy = date.today()
         periodo_actual = 0
@@ -188,7 +188,6 @@ elif st.session_state.vista == "dashboard":
             st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None})
             st.rerun()
 
-    # --- SELECCIÓN DE PERIODO (Optimizado para móvil) ---
     opciones_periodo = []
     for i, p in enumerate(participantes):
         f_p = calcular_fecha_periodo(f_inicio_dt, i, grupo['frecuencia'])
@@ -262,27 +261,9 @@ elif st.session_state.vista == "dashboard":
             st.subheader("🔑 Credenciales del Grupo")
             st.code(f"Código: {grupo['codigo']}\nContraseña: {grupo['password']}", language=None)
             st.write("---")
-            st.subheader("👥 Gestión de Miembros")
-            for i, p in enumerate(participantes):
-                col_n, col_u, col_d, col_x = st.columns([3, 1, 1, 1])
-                col_n.write(f"**{i+1}. {p['nombre_usuario']}**")
-                if i > 0:
-                    if col_u.button("↑", key=f"up_{p['id']}"):
-                        supabase.table("participantes").update({"posicion_orden": i-1}).eq("id", p['id']).execute()
-                        supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i-1]['id']).execute()
-                        st.rerun()
-                if i < len(participantes)-1:
-                    if col_d.button("↓", key=f"dw_{p['id']}"):
-                        supabase.table("participantes").update({"posicion_orden": i+1}).eq("id", p['id']).execute()
-                        supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i+1]['id']).execute()
-                        st.rerun()
-                if p['nombre_usuario'] != st.session_state.mi_nombre:
-                    if col_x.button("❌", key=f"del_{p['id']}"):
-                        supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
-
-            st.write("---")
+            
+            # --- MEJORA 1: CONTROL DE PAGOS PRIMERO ---
             st.subheader(f"✅ Control de Pagos Periodo {idx_p + 1}")
-            # --- SECCIÓN VALIDAR PENDIENTES ---
             avisos_periodo = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
             if avisos_periodo:
                 for a in avisos_periodo:
@@ -296,19 +277,41 @@ elif st.session_state.vista == "dashboard":
                             "periodos_pagados": ",".join(filter(None, pagos))
                         }).eq("id", a['id']).execute(); st.rerun()
             
-            # --- SECCIÓN ANULAR CONFIRMADOS ---
             pagados_periodo = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
             if pagados_periodo:
                 st.caption("Pagos ya confirmados:")
                 for p_conf in pagados_periodo:
                     col_txt, col_btn = st.columns([2, 1])
                     col_txt.write(f"✓ {p_conf['nombre_usuario']}")
-                    if col_btn.button("Anular validación", key=f"rev_{p_conf['id']}", type="secondary"):
+                    if col_btn.button("Anular", key=f"rev_{p_conf['id']}", type="secondary"):
                         pagos = str(p_conf.get('periodos_pagados', "")).split(",")
                         if str(idx_p) in pagos: pagos.remove(str(idx_p))
                         supabase.table("participantes").update({"periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p_conf['id']).execute(); st.rerun()
             
             if not avisos_periodo and not pagados_periodo: st.caption("Sin actividad en este periodo.")
+            st.write("---")
+
+            # --- MEJORA 2: GESTIÓN DE MIEMBROS MÓVIL ---
+            st.subheader("👥 Gestión de Miembros")
+            for i, p in enumerate(participantes):
+                with st.container():
+                    st.markdown(f'<div class="member-card">', unsafe_allow_html=True)
+                    st.write(f"**{i+1}. {p['nombre_usuario']}**")
+                    c1, c2, c3 = st.columns(3)
+                    if i > 0:
+                        if c1.button("↑ Subir", key=f"up_{p['id']}"):
+                            supabase.table("participantes").update({"posicion_orden": i-1}).eq("id", p['id']).execute()
+                            supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i-1]['id']).execute()
+                            st.rerun()
+                    if i < len(participantes)-1:
+                        if c2.button("↓ Bajar", key=f"dw_{p['id']}"):
+                            supabase.table("participantes").update({"posicion_orden": i+1}).eq("id", p['id']).execute()
+                            supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i+1]['id']).execute()
+                            st.rerun()
+                    if p['nombre_usuario'] != st.session_state.mi_nombre:
+                        if c3.button("❌ Borrar", key=f"del_{p['id']}"):
+                            supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             if st.button("ELIMINAR TODO EL LOOP"):
