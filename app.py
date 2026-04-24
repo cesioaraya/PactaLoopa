@@ -125,11 +125,13 @@ elif st.session_state.vista == "unirse":
         else: st.error("Código no encontrado.")
 
 elif st.session_state.vista == "seleccionar_usuario":
-    p_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
+    p_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
     g_db = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
     grupo = g_db.data[0]
     nombres = [p['nombre_usuario'] for p in p_db.data]
-    admin_nombre = nombres[0] if nombres else ""
+    # FIX: Identificar admin por ID menor (creador), no por posición actual
+    admin_data = min(p_db.data, key=lambda x: x['id']) if p_db.data else None
+    admin_nombre = admin_data['nombre_usuario'] if admin_data else ""
 
     opciones = ["-- Seleccionar --"]
     if grupo.get('abierto', True): opciones.append("-- Nuevo Miembro --")
@@ -161,7 +163,9 @@ elif st.session_state.vista == "dashboard":
     grupo = g_res.data[0]
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
-    admin_nombre = participantes[0]['nombre_usuario'] if participantes else ""
+    # FIX: Identificar admin por ID menor (creador), no por posición actual
+    admin_data = min(participantes, key=lambda x: x['id']) if participantes else None
+    admin_nombre = admin_data['nombre_usuario'] if admin_data else ""
     es_admin = (st.session_state.mi_nombre == admin_nombre)
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
@@ -258,12 +262,10 @@ elif st.session_state.vista == "dashboard":
 
             st.write("---")
             st.subheader(f"✅ Validar Pagos Periodo {idx_p + 1}")
-            # Solo muestra quienes avisaron para el periodo seleccionado actualmente
             avisos_periodo = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
             if avisos_periodo:
                 for a in avisos_periodo:
                     if st.button(f"Confirmar pago de {a['nombre_usuario']}"):
-                        # Mover de avisados a pagados para este periodo
                         avisos = str(a.get('periodos_avisados', "")).split(",")
                         pagos = str(a.get('periodos_pagados', "")).split(",")
                         if str(idx_p) in avisos: avisos.remove(str(idx_p))
