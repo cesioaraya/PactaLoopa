@@ -4,6 +4,7 @@ from supabase import create_client, Client
 import random
 import string
 from datetime import datetime, date, timedelta
+import calendar
 
 # 1. CONFIGURACIÓN
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
@@ -31,7 +32,6 @@ def calcular_fecha_periodo(fecha_inicio, indice, frecuencia):
         try:
             return date(anios, meses, dia)
         except ValueError:
-            import calendar
             ultimo_dia = calendar.monthrange(anios, meses)[1]
             return date(anios, meses, ultimo_dia)
     elif frecuencia == "quincenal":
@@ -64,7 +64,7 @@ st.markdown("""
 st.title("🤝 PactaLoopa")
 
 if "grupo_id" not in st.session_state:
-    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": "", "mostrar_exito": False, "nuevo_codigo": "", "periodo_seleccionado": 0})
+    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": "", "mostrar_exito": False, "nuevo_codigo": "", "periodo_seleccionado": None})
 
 # --- DIÁLOGO DE ÉXITO ---
 @st.dialog("🚀 ¡Pacto Creado con Éxito!")
@@ -168,23 +168,38 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
     
-    with st.sidebar:
-        st.write(f"### 🛡️ {grupo['nombre']}")
-        st.info(f"Usuario: **{st.session_state.mi_nombre}**")
-        if st.button("🚪 Cerrar Sesión"):
-            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
-            st.rerun()
-        st.divider()
-        st.write("📅 **Periodos del Loop**")
-        for i, p in enumerate(participantes):
+    # --- DETERMINAR PERIODO ACTUAL POR DEFECTO ---
+    if st.session_state.periodo_seleccionado is None:
+        hoy = date.today()
+        periodo_actual = 0
+        menor_dif = float('inf')
+        for i in range(len(participantes)):
             f_p = calcular_fecha_periodo(f_inicio_dt, i, grupo['frecuencia'])
-            if st.button(f"P{i+1}: {p['nombre_usuario']} ({f_p.strftime('%d/%m')})", key=f"per_{i}"):
-                st.session_state.periodo_seleccionado = i
-        
-    idx_p = st.session_state.periodo_seleccionado
-    beneficiario_p = participantes[idx_p] if idx_p < len(participantes) else participantes[0]
-    fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
+            dif = abs((f_p - hoy).days)
+            if dif < menor_dif:
+                menor_dif = dif
+                periodo_actual = i
+        st.session_state.periodo_seleccionado = periodo_actual
+
+    with st.sidebar:
+        st.write(f"### 👤 {st.session_state.mi_nombre}")
+        st.caption("PactaLoopa v2.0")
+        if st.button("🚪 Cerrar Sesión"):
+            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None})
+            st.rerun()
+
+    # --- SELECCIÓN DE PERIODO (Optimizado para móvil) ---
+    opciones_periodo = []
+    for i, p in enumerate(participantes):
+        f_p = calcular_fecha_periodo(f_inicio_dt, i, grupo['frecuencia'])
+        opciones_periodo.append(f"P{i+1}: {p['nombre_usuario']} ({f_p.strftime('%d/%m')})")
     
+    st.write(f"### 🛡️ {grupo['nombre']}")
+    idx_p = st.selectbox("Seleccionar Periodo", range(len(opciones_periodo)), format_func=lambda x: opciones_periodo[x], index=st.session_state.periodo_seleccionado)
+    st.session_state.periodo_seleccionado = idx_p
+
+    beneficiario_p = participantes[idx_p]
+    fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
     dias_restantes = (fecha_p - date.today()).days
     txt_restantes = f"{dias_restantes} días" if dias_restantes > 0 else "¡Hoy!" if dias_restantes == 0 else "Finalizado"
 
@@ -220,14 +235,9 @@ elif st.session_state.vista == "dashboard":
             else:
                 pagado = ha_pagado_periodo(yo, idx_p)
                 avisado = ha_avisado_periodo(yo, idx_p)
-                
-                # --- LÓGICA DE BLOQUEO DE PERIODOS FUTUROS ---
                 hoy = date.today()
-                # Calculamos el último día del mes actual para permitir reportar hasta el final del mes vigente
-                import calendar
                 ultimo_dia_mes_actual = date(hoy.year, hoy.month, calendar.monthrange(hoy.year, hoy.month)[1])
                 es_futuro = fecha_p > ultimo_dia_mes_actual
-                # ---------------------------------------------
 
                 if pagado: 
                     st.success("✅ Tu cuota ya está marcada como pagada para este periodo.")
@@ -239,7 +249,7 @@ elif st.session_state.vista == "dashboard":
                         supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
                 elif es_futuro:
                     st.info(f"📅 El reporte para este periodo se activará en **{fecha_p.strftime('%B')}**.")
-                    st.button("📢 INFORMAR QUE YA PAGUÉ", disabled=True, help="No puedes reportar pagos de meses futuros.")
+                    st.button("📢 INFORMAR QUE YA PAGUÉ", disabled=True)
                 else:
                     st.info(f"Monto: **${grupo['monto_cuota']}**")
                     if st.button("📢 INFORMAR QUE YA PAGUÉ"):
@@ -271,21 +281,34 @@ elif st.session_state.vista == "dashboard":
                         supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
 
             st.write("---")
-            st.subheader(f"✅ Validar Pagos Periodo {idx_p + 1}")
+            st.subheader(f"✅ Control de Pagos Periodo {idx_p + 1}")
+            # --- SECCIÓN VALIDAR PENDIENTES ---
             avisos_periodo = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
             if avisos_periodo:
                 for a in avisos_periodo:
-                    if st.button(f"Confirmar pago de {a['nombre_usuario']}"):
+                    if st.button(f"Confirmar pago de {a['nombre_usuario']}", key=f"conf_{a['id']}"):
                         avisos = str(a.get('periodos_avisados', "")).split(",")
                         pagos = str(a.get('periodos_pagados', "")).split(",")
                         if str(idx_p) in avisos: avisos.remove(str(idx_p))
                         if str(idx_p) not in pagos: pagos.append(str(idx_p))
-                        
                         supabase.table("participantes").update({
                             "periodos_avisados": ",".join(filter(None, avisos)),
                             "periodos_pagados": ",".join(filter(None, pagos))
                         }).eq("id", a['id']).execute(); st.rerun()
-            else: st.caption(f"Sin pagos pendientes para el Periodo {idx_p + 1}.")
+            
+            # --- SECCIÓN ANULAR CONFIRMADOS ---
+            pagados_periodo = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
+            if pagados_periodo:
+                st.caption("Pagos ya confirmados:")
+                for p_conf in pagados_periodo:
+                    col_txt, col_btn = st.columns([2, 1])
+                    col_txt.write(f"✓ {p_conf['nombre_usuario']}")
+                    if col_btn.button("Anular validación", key=f"rev_{p_conf['id']}", type="secondary"):
+                        pagos = str(p_conf.get('periodos_pagados', "")).split(",")
+                        if str(idx_p) in pagos: pagos.remove(str(idx_p))
+                        supabase.table("participantes").update({"periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p_conf['id']).execute(); st.rerun()
+            
+            if not avisos_periodo and not pagados_periodo: st.caption("Sin actividad en este periodo.")
 
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             if st.button("ELIMINAR TODO EL LOOP"):
