@@ -32,6 +32,7 @@ st.markdown("""
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; }
+    [data-testid="stSidebarNav"] {display: none;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -39,13 +40,15 @@ st.title("🤝 PactaLoopa")
 
 # Inicializar estados
 if "grupo_id" not in st.session_state:
-    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": "", "mostrar_exito": False, "nuevo_codigo": ""})
+    st.session_state.update({"grupo_id": None, "vista": "inicio", "mi_nombre": "", "mostrar_exito": False, "nuevo_codigo": "", "periodo_seleccionado": 0})
 
 # --- DIÁLOGO DE ÉXITO ---
 @st.dialog("🚀 ¡Pacto Creado con Éxito!")
 def mostrar_credenciales_nuevas(codigo, password):
     st.write("Comparte estos datos con tu grupo:")
-    st.code(f"Código: {codigo}\nContraseña: {password}", language=None)
+    st.code(f"Código: {codigo}", language=None)
+    st.write("Solo tú (Admin) necesitas la contraseña para gestionar el grupo.")
+    st.code(f"Contraseña Admin: {password}", language=None)
     if st.button("Entrar al Dashboard"):
         st.session_state.mostrar_exito = False
         st.rerun()
@@ -68,7 +71,7 @@ elif st.session_state.vista == "crear":
     monto = st.number_input("Cuota Mensual ($)", min_value=1, value=100)
     frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
     fecha_inicio = st.date_input("Fecha primer pozo", value=date.today())
-    pass_pacto = st.text_input("Contraseña del grupo", type="password")
+    pass_pacto = st.text_input("Contraseña del administrador", type="password")
     tu_nombre = st.text_input("Tu nombre (Admin)").strip()
     
     if st.button("🚀 Crear Pacto"):
@@ -89,14 +92,20 @@ elif st.session_state.vista == "crear":
 
 elif st.session_state.vista == "unirse":
     if st.button("⬅️ Volver"): st.session_state.vista = "inicio"; st.rerun()
-    c_in = st.text_input("Código").upper().strip()
-    p_in = st.text_input("Contraseña", type="password")
+    c_in = st.text_input("Código de Grupo").upper().strip()
+    p_in = st.text_input("Contraseña (Solo si eres el Admin)", type="password", help="Los miembros normales dejen este campo vacío")
+    
     if st.button("Entrar"):
-        g = supabase.table("grupos").select("*").eq("codigo", c_in).eq("password", p_in).execute()
+        query = supabase.table("grupos").select("*").eq("codigo", c_in)
+        if p_in: # Si intenta entrar como admin
+            query = query.eq("password", p_in)
+        
+        g = query.execute()
         if g.data:
             st.session_state.grupo_id = g.data[0]['id']
             st.session_state.vista = "seleccionar_usuario"; st.rerun()
-        else: st.error("Datos incorrectos")
+        else:
+            st.error("Código incorrecto o contraseña de admin inválida.")
 
 elif st.session_state.vista == "seleccionar_usuario":
     p_db = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).execute()
@@ -131,80 +140,119 @@ elif st.session_state.vista == "dashboard":
     es_admin = (st.session_state.mi_nombre == admin_nombre)
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
 
-    # Lógica de fechas
-    beneficiario = next((p for p in participantes if not p.get('recibio_pozo', False)), None)
-    idx_periodo = participantes.index(beneficiario) if beneficiario else 0
+    # Lógica de periodos para el Sidebar
     salto = {"semanal": 7, "quincenal": 15, "mensual": 30}.get(grupo['frecuencia'], 30)
-    fecha_entrega = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=idx_periodo * salto)
-
+    
     with st.sidebar:
         st.write(f"### 🛡️ {grupo['nombre']}")
         st.info(f"Usuario: **{st.session_state.mi_nombre}**")
         if st.button("🚪 Cerrar Sesión"):
             st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
             st.rerun()
+        
+        st.divider()
+        st.write("📅 **Periodos del Loop**")
+        for i, p in enumerate(participantes):
+            f_p = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=i * salto)
+            label = f"P{i+1}: {p['nombre_usuario']} ({f_p.strftime('%d/%m')})"
+            if st.button(label, key=f"per_{i}"):
+                st.session_state.periodo_seleccionado = i
+        
+    # El periodo visualizado depende de la selección del sidebar
+    idx_p = st.session_state.periodo_seleccionado
+    beneficiario_p = participantes[idx_p] if idx_p < len(participantes) else participantes[0]
+    fecha_p = date.fromisoformat(grupo['fecha_inicio']) + timedelta(days=idx_p * salto)
 
-    t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if es_admin else "ℹ️ Info"])
+    t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Reportar Pago", "⚙️ Admin" if es_admin else "ℹ️ Info"])
 
     with t1:
-        st.subheader("Estado del Pacto")
+        st.subheader(f"Periodo {idx_p + 1}")
         st.markdown(f"""
         <div class="info-card">
-            📅 <b>Ciclo:</b> Cada {grupo['frecuencia']}<br>
-            👤 <b>Beneficiario actual:</b> {beneficiario['nombre_usuario'] if beneficiario else 'Ciclo finalizado'}<br>
-            💰 <b>Pozo estimado:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}<br>
-            🗓️ <b>Fecha de entrega:</b> {fecha_entrega.strftime('%d de %B de %Y')}
+            👤 <b>Recibe Pozo:</b> {beneficiario_p['nombre_usuario']}<br>
+            🗓️ <b>Fecha Estimada:</b> {fecha_p.strftime('%d de %B de %Y')}<br>
+            💰 <b>Monto Pozo:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
         </div>
         """, unsafe_allow_html=True)
         
         for p in participantes:
-            col_u, col_p, col_r = st.columns([2, 2, 1])
-            with col_u: st.write(f"{'⭐ ' if p == beneficiario else ''}{p['nombre_usuario']}")
+            col_u, col_p = st.columns([2, 1])
+            with col_u: st.write(f"{'🎁 ' if p == beneficiario_p else '👤 '}{p['nombre_usuario']}")
             with col_p:
-                if p == beneficiario: st.caption("Recibe pozo")
+                if p == beneficiario_p: st.caption("Beneficiario")
                 else:
+                    # Nota: En una versión real, los pagos deberían estar en una tabla separada por periodo. 
+                    # Aquí mantenemos la estructura simple solicitada.
                     status = "PAGADO" if p.get('pago_cuota') else "PENDIENTE"
                     clase = "pago-si" if p.get('pago_cuota') else "pago-no"
                     st.markdown(f"<span class='status-badge {clase}'>{status}</span>", unsafe_allow_html=True)
-            with col_r:
-                if p.get('recibio_pozo'): st.write("🎁")
 
     with t2:
-        st.subheader("Tu actividad")
+        st.subheader(f"Tu pago para el Periodo {idx_p + 1}")
         if yo:
-            if yo == beneficiario:
-                st.success("¡Este periodo te toca recibir el pozo! No debes pagar cuota.")
+            if yo['nombre_usuario'] == beneficiario_p['nombre_usuario']:
+                st.success("En este periodo tú recibes el pozo. No debes reportar pago.")
             else:
                 if yo.get('pago_cuota'):
-                    st.success("✅ Tu cuota de este mes ya fue validada.")
+                    st.success("✅ Tu cuota ya está marcada como pagada.")
                 elif yo.get('aviso_pago'):
-                    st.warning("🔔 Pago reportado. Esperando validación del administrador.")
+                    st.warning("🔔 Pago reportado. Esperando validación.")
                     if st.button("Cancelar Reporte"):
                         supabase.table("participantes").update({"aviso_pago": False}).eq("id", yo['id']).execute()
                         st.rerun()
                 else:
-                    st.info(f"💵 Monto a pagar: **${grupo['monto_cuota']}**")
-                    st.warning(f"⚠️ Fecha límite de pago: **{fecha_entrega.strftime('%d de %B')}**")
-                    if st.button("📢 YA DEPOSITÉ MI CUOTA"):
+                    st.info(f"Monto: **${grupo['monto_cuota']}**")
+                    if st.button("📢 INFORMAR QUE YA PAGUÉ"):
                         supabase.table("participantes").update({"aviso_pago": True}).eq("id", yo['id']).execute()
                         st.rerun()
 
     with t3:
         if es_admin:
-            # Sección Admin (igual que tenías pero bien organizada)
-            st.subheader("🔑 Acceso")
-            st.write(f"Código: `{grupo['codigo']}` | Pass: `{grupo['password']}`")
-            # [Aquí iría el resto de la lógica de admin de tu versión anterior]
-            st.subheader("✅ Validar Cuotas")
-            for a in [p for p in participantes if p.get('aviso_pago')]:
-                if st.button(f"Confirmar pago de {a['nombre_usuario']}"):
-                    supabase.table("participantes").update({"aviso_pago": False, "pago_cuota": True}).eq("id", a['id']).execute()
+            st.subheader("Gestión de Miembros")
+            
+            # Reordenar Miembros
+            st.write("---")
+            st.write("📋 **Cambiar orden (solo quienes no han recibido pozo)**")
+            pendientes = [p for p in participantes if not p.get('recibio_pozo')]
+            if len(pendientes) > 1:
+                m1 = st.selectbox("Mover a:", [p['nombre_usuario'] for p in pendientes], key="m1")
+                pos_nueva = st.number_input("A la posición (0 es primero):", 0, len(participantes)-1, 0)
+                if st.button("Cambiar Posición"):
+                    p_obj = next(p for p in participantes if p['nombre_usuario'] == m1)
+                    supabase.table("participantes").update({"posicion_orden": pos_nueva}).eq("id", p_obj['id']).execute()
                     st.rerun()
-            # ... (Resto de botones de admin)
+
+            # Eliminar Miembros
+            st.write("---")
+            st.write("❌ **Eliminar Miembro**")
+            to_del = st.selectbox("Seleccionar para eliminar:", [p['nombre_usuario'] for p in participantes if p['nombre_usuario'] != st.session_state.mi_nombre])
+            if st.button("Eliminar permanentemente"):
+                p_del = next(p for p in participantes if p['nombre_usuario'] == to_del)
+                supabase.table("participantes").delete().eq("id", p_del['id']).execute()
+                st.rerun()
+
+            # Validar Pagos
+            st.write("---")
+            st.subheader("✅ Validar Cuotas Reportadas")
+            avisos = [p for p in participantes if p.get('aviso_pago')]
+            if avisos:
+                for a in avisos:
+                    if st.button(f"Confirmar pago de {a['nombre_usuario']}"):
+                        supabase.table("participantes").update({"aviso_pago": False, "pago_cuota": True}).eq("id", a['id']).execute()
+                        st.rerun()
+            else: st.caption("No hay pagos pendientes de validación.")
+
+            # Eliminar Loop
+            st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
+            st.subheader("🗑️ Zona de Peligro")
+            if st.button("ELIMINAR TODO EL LOOP"):
+                supabase.table("participantes").delete().eq("grupo_id", st.session_state.grupo_id).execute()
+                supabase.table("grupos").delete().eq("id", st.session_state.grupo_id).execute()
+                st.session_state.update({"grupo_id": None, "vista": "inicio"})
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.subheader("📅 Cronograma del Pacto")
+            st.subheader("ℹ️ Información del Pacto")
+            st.write(f"**Código:** {grupo['codigo']}")
             st.write(f"**Frecuencia:** {grupo['frecuencia'].capitalize()}")
-            st.write(f"**Inicio oficial:** {date.fromisoformat(grupo['fecha_inicio']).strftime('%d de %B de %Y')}")
-            st.write("El ciclo de pagos se reinicia cada vez que el beneficiario recibe el pozo.")
-            st.write(f"**Frecuencia:** {grupo['frecuencia']}")
             st.write(f"**Inicio:** {grupo['fecha_inicio']}")
