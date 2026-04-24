@@ -85,7 +85,7 @@ LANGS = {
         "seleccionar": "-- Sélectionner --", "btn_unirme": "Rejoindre", "pass_admin_label": "Mot de Passe (Admin)",
         "btn_entrar": "Tableau de Bord", "usuario": "Utilisateur", "salir": "🚪 Quitter",
         "recibe": "Reçoit le Pot", "fecha_est": "Date Estimée", "estado": "État", "pozo_total": "Total du Pot",
-        "activo": "Période Active!", "faltan": "Il reste", "dias": "jours", "ya_pague": "📢 J'AI PAYÉ",
+        "activo": "Période Active!", "faltan": "Il reste", "jours": "jours", "ya_pague": "📢 J'AI PAYÉ",
         "admin_tag": "Admin", "tab_loop": "🔄 Le Loop", "tab_pago": "💰 Mon Paiement", "tab_gestion": "⚙️ Gestion", "tab_info": "ℹ️ Info"
     },
     "Tiếng Việt": {
@@ -385,6 +385,20 @@ elif st.session_state.vista == "dashboard":
                     if str(idx_p) in avisos: avisos.remove(str(idx_p))
                     if str(idx_p) not in pagos: pagos.append(str(idx_p))
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
+            
+            # --- NUEVA SECCIÓN: CANCELAR CONFIRMACIÓN ---
+            st.write("---")
+            st.subheader("Pagos Confirmados")
+            confirmados = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
+            if not confirmados: st.caption("No hay pagos confirmados en este periodo.")
+            for p in confirmados:
+                col_c1, col_c2 = st.columns([3, 1])
+                col_c1.write(f"✅ {p['nombre_usuario']}")
+                if col_c2.button("Deshacer", key=f"undo_{p['id']}"):
+                    pagos = str(p.get('periodos_pagados', "")).split(",")
+                    if str(idx_p) in pagos: pagos.remove(str(idx_p))
+                    # Opcionalmente lo devolvemos a "avisado" o simplemente lo quitamos de pagado
+                    supabase.table("participantes").update({"periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
             st.subheader("Order")
