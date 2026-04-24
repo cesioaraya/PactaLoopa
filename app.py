@@ -64,7 +64,7 @@ LANGS = {
         "btn_entrar": "डैशबोर्ड खोलें", "usuario": "उपयोगकर्ता", "salir": "🚪 बाहर निकलें",
         "recibe": "प्राप्तकर्ता", "fecha_est": "अनुमानित तिथि", "estado": "स्थिति", "pozo_total": "कुल पूल",
         "activo": "अवधि सक्रिय!", "faltan": "शेष", "dias": "दिन", "ya_pague": "📢 मैंने भुगतान कर दिया",
-        "admin_tag": "एडमिन", "tab_loop": "🔄 लूप", "tab_pago": "💰 मेरा भुगतान", "tab_gestion": "⚙️ प्रबंधन", "tab_info": "ℹ️ जानकारी"
+        "admin_tag": "एडमिन", "tab_loop": "🔄 लूप", "tab_pago": "💰 मेरा भुगतान", "tab_gestion": "⚙️ प्रबंधन", "tab_info": "जानकारी"
     }
 }
 
@@ -92,9 +92,10 @@ if "grupo_id" not in st.session_state:
         "lang": "Español"
     })
 
-# Selector de idioma global
-with st.sidebar:
-    st.session_state.lang = st.selectbox("🌐 Language", list(LANGS.keys()), index=list(LANGS.keys()).index(st.session_state.lang))
+# --- SELECTOR DE IDIOMA ENCABEZADO ---
+header_col1, header_col2 = st.columns([3, 1])
+with header_col2:
+    st.session_state.lang = st.selectbox("🌐", list(LANGS.keys()), index=list(LANGS.keys()).index(st.session_state.lang), label_visibility="collapsed")
 T = LANGS[st.session_state.lang]
 
 def generar_codigo():
@@ -291,7 +292,7 @@ elif st.session_state.vista == "dashboard":
                 fecha_apertura = fecha_p - timedelta(days=5)
                 st.info(f"🛡️ Podrás avisar a partir del **{fecha_apertura.strftime('%d/%m/%Y')}**.")
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
-                st.success("✨ You receive the pool this period!")
+                st.success("✨ You receive the pool!")
             else:
                 if ha_pagado_periodo(yo, idx_p): 
                     st.success("✅ Confirmed.")
