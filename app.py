@@ -142,7 +142,6 @@ elif st.session_state.vista == "seleccionar_usuario":
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
             
     elif sel != "-- Seleccionar --":
-        # LOGICA CORREGIDA: Contraseña solo requerida para modo Admin
         st.info("Deja la contraseña en blanco si eres un miembro normal.")
         p_check = st.text_input("Contraseña (Solo Administrador)", type="password")
         if st.button("Entrar al Dashboard"):
@@ -163,7 +162,6 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
-    # BARRA DE USUARIO SUPERIOR (Sin Sidebar)
     ucol1, ucol2 = st.columns([3, 1])
     ucol1.markdown(f"**👤 Usuario:** {st.session_state.mi_nombre} {' (🛡️ Admin)' if st.session_state.es_admin else ''}")
     if ucol2.button("🚪 Salir"):
@@ -173,7 +171,6 @@ elif st.session_state.vista == "dashboard":
     st.markdown("---")
     st.write(f"### {grupo['nombre']}")
 
-    # SELECCIÓN AUTOMÁTICA DEL PERIODO CERCANO
     hoy = date.today()
     if st.session_state.periodo_seleccionado is None:
         mejor_idx = 0
@@ -191,7 +188,6 @@ elif st.session_state.vista == "dashboard":
         st.info("Esperando a que se unan miembros...")
         st.stop()
     
-    # SELECTOR DE PERIODO
     with st.expander(f"📅 Ver Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
         idx_p = st.radio(
             "Selecciona un periodo:",
@@ -215,8 +211,8 @@ elif st.session_state.vista == "dashboard":
         <div class="info-card">
             👤 <b>Recibe Pozo:</b> {benef['nombre_usuario']}<br>
             🗓️ <b>Fecha Estimada:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
-            ⏳ <b>Estado:</b> {"¡Periodo Activo!" if dias_restantes <= 0 else f"Faltan {dias_restantes} días"}<br>
-            💰 <b>Pozo Total:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
+            ⏳ <b>Estado:</b> {"¡Periodo Activo!" if dias_restantes <= 0 else f"Faltan {dias_restantes} días"}
+            <br>💰 <b>Pozo Total:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -227,21 +223,17 @@ elif st.session_state.vista == "dashboard":
                 pagado = ha_pagado_periodo(p, idx_p)
                 col_b.markdown(f"<span class='status-badge {'pago-si' if pagado else 'pago-no'}'>{'SÍ' if pagado else 'NO'}</span>", unsafe_allow_html=True)
 
-with t2:
+    with t2:
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
             dias_para_el_pozo = (fecha_p - hoy).days
-            
-            # Permitimos avisar desde 5 días antes
             puede_avisar = dias_para_el_pozo <= 5
             
             if not puede_avisar:
                 fecha_apertura = fecha_p - timedelta(days=5)
                 st.info(f"🛡️ **Reporte pendiente.** Podrás avisar tu pago a partir del **{fecha_apertura.strftime('%d/%m/%Y')}** (5 días antes del pozo).")
-            
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
                 st.success("✨ ¡En este periodo tú recibes el pozo!")
-            
             else:
                 if ha_pagado_periodo(yo, idx_p): 
                     st.success("✅ Tu pago ha sido confirmado por el administrador.")
@@ -254,11 +246,11 @@ with t2:
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
                         if str(idx_p) not in avisos:
                             avisos.append(str(idx_p))
-                            # Limpiar strings vacíos y actualizar
                             lista_avisos = ",".join(filter(None, avisos))
                             supabase.table("participantes").update({"periodos_avisados": lista_avisos}).eq("id", yo['id']).execute()
                             st.toast("Aviso enviado al administrador")
                             st.rerun()
+
     with t3:
         if st.session_state.es_admin:
             st.subheader("Validar Pagos")
