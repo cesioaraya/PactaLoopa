@@ -9,6 +9,65 @@ import calendar
 # 1. CONFIGURACIÓN
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
 
+# --- DICCIONARIO DE IDIOMAS ---
+LANGS = {
+    "Español": {
+        "crear": "✨ Crear Nuevo Pacto", "unirse": "🤝 Entrar a un Pacto", "volver": "⬅️ Volver",
+        "nombre_pacto": "Nombre del Pacto", "cuota": "Cuota ($)", "frecuencia": "Frecuencia",
+        "primer_pozo": "Primer pozo", "tu_nombre": "Tu nombre", "btn_crear": "Crear Pacto",
+        "buscar": "Buscar Pacto", "quien_eres": "¿Quién eres?", "nuevo_miembro": "-- Nuevo Miembro --",
+        "seleccionar": "-- Seleccionar --", "btn_unirme": "Unirme", "pass_admin_label": "Contraseña (Solo Administrador)",
+        "btn_entrar": "Entrar al Dashboard", "usuario": "Usuario", "salir": "🚪 Salir",
+        "recibe": "Recibe Pozo", "fecha_est": "Fecha Estimada", "estado": "Estado", "pozo_total": "Pozo Total",
+        "activo": "¡Periodo Activo!", "faltan": "Faltan", "dias": "días", "ya_pague": "📢 YA PAGUÉ",
+        "admin_tag": "Admin", "tab_loop": "🔄 El Loop", "tab_pago": "💰 Mi Pago", "tab_gestion": "⚙️ Gestión", "tab_info": "ℹ️ Info"
+    },
+    "English": {
+        "crear": "✨ Create New Pact", "unirse": "🤝 Join a Pact", "volver": "⬅️ Back",
+        "nombre_pacto": "Pact Name", "cuota": "Fee ($)", "frecuencia": "Frequency",
+        "primer_pozo": "First Pool Date", "tu_nombre": "Your Name", "btn_crear": "Create Pact",
+        "buscar": "Search Pact", "quien_eres": "Who are you?", "nuevo_miembro": "-- New Member --",
+        "seleccionar": "-- Select --", "btn_unirme": "Join", "pass_admin_label": "Password (Admin Only)",
+        "btn_entrar": "Enter Dashboard", "usuario": "User", "salir": "🚪 Logout",
+        "recibe": "Receives Pool", "fecha_est": "Estimated Date", "estado": "Status", "pozo_total": "Total Pool",
+        "activo": "Period Active!", "faltan": "Missing", "dias": "days", "ya_pague": "📢 I'VE PAID",
+        "admin_tag": "Admin", "tab_loop": "🔄 The Loop", "tab_pago": "💰 My Payment", "tab_gestion": "⚙️ Manage", "tab_info": "ℹ️ Info"
+    },
+    "Français": {
+        "crear": "✨ Créer un Pacte", "unirse": "🤝 Rejoindre un Pacte", "volver": "⬅️ Retour",
+        "nombre_pacto": "Nom du Pacte", "cuota": "Cotisation ($)", "frecuencia": "Fréquence",
+        "primer_pozo": "Premier Collecte", "tu_nombre": "Votre Nom", "btn_crear": "Créer le Pacte",
+        "buscar": "Chercher Pacte", "quien_eres": "Qui êtes-vous?", "nuevo_miembro": "-- Nouveau Membre --",
+        "seleccionar": "-- Sélectionner --", "btn_unirme": "Rejoindre", "pass_admin_label": "Mot de Passe (Admin)",
+        "btn_entrar": "Tableau de Bord", "usuario": "Utilisateur", "salir": "🚪 Quitter",
+        "recibe": "Reçoit le Pot", "fecha_est": "Date Estimée", "estado": "État", "pozo_total": "Total du Pot",
+        "activo": "Période Active!", "faltan": "Il reste", "dias": "jours", "ya_pague": "📢 J'AI PAYÉ",
+        "admin_tag": "Admin", "tab_loop": "🔄 Le Loop", "tab_pago": "💰 Mon Paiement", "tab_gestion": "⚙️ Gestion", "tab_info": "ℹ️ Info"
+    },
+    "中文": {
+        "crear": "✨ 创建新协议", "unirse": "🤝 加入协议", "volver": "⬅️ 返回",
+        "nombre_pacto": "协议名称", "cuota": "金额 ($)", "frecuencia": "频率",
+        "primer_pozo": "首次日期", "tu_nombre": "您的名字", "btn_crear": "创建协议",
+        "buscar": "搜索协议", "quien_eres": "您是谁？", "nuevo_miembro": "-- 新成员 --",
+        "seleccionar": "-- 请选择 --", "btn_unirme": "加入", "pass_admin_label": "密码 (仅限管理员)",
+        "btn_entrar": "进入仪表板", "usuario": "用户", "salir": "🚪 退出",
+        "recibe": "收款人", "fecha_est": "预计日期", "estado": "状态", "pozo_total": "总金额",
+        "activo": "期间有效！", "faltan": "剩余", "dias": "天", "ya_pague": "📢 我已付款",
+        "admin_tag": "管理员", "tab_loop": "🔄 循环", "tab_pago": "💰 我的付款", "tab_gestion": "⚙️ 管理", "tab_info": "ℹ️ 信息"
+    },
+    "हिन्दी": {
+        "crear": "✨ नया समझौता", "unirse": "🤝 समझौते में शामिल हों", "volver": "⬅️ वापस",
+        "nombre_pacto": "समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
+        "primer_pozo": "पहला पूल", "tu_nombre": "आपका नाम", "btn_crear": "समझौता बनाएं",
+        "buscar": "समझौता खोजें", "quien_eres": "आप कौन हैं?", "nuevo_miembro": "-- नया सदस्य --",
+        "seleccionar": "-- चुनें --", "btn_unirme": "शामिल हों", "pass_admin_label": "पासवर्ड (केवल एडमिन)",
+        "btn_entrar": "डैशबोर्ड खोलें", "usuario": "उपयोगकर्ता", "salir": "🚪 बाहर निकलें",
+        "recibe": "प्राप्तकर्ता", "fecha_est": "अनुमानित तिथि", "estado": "स्थिति", "pozo_total": "कुल पूल",
+        "activo": "अवधि सक्रिय!", "faltan": "शेष", "dias": "दिन", "ya_pague": "📢 मैंने भुगतान कर दिया",
+        "admin_tag": "एडमिन", "tab_loop": "🔄 लूप", "tab_pago": "💰 मेरा भुगतान", "tab_gestion": "⚙️ प्रबंधन", "tab_info": "ℹ️ जानकारी"
+    }
+}
+
 @st.cache_resource
 def init_connection():
     try:
@@ -29,8 +88,14 @@ if "grupo_id" not in st.session_state:
         "mostrar_exito": False, 
         "nuevo_codigo": "", 
         "periodo_seleccionado": None,
-        "es_admin": False
+        "es_admin": False,
+        "lang": "Español"
     })
+
+# Selector de idioma global
+with st.sidebar:
+    st.session_state.lang = st.selectbox("🌐 Language", list(LANGS.keys()), index=list(LANGS.keys()).index(st.session_state.lang))
+T = LANGS[st.session_state.lang]
 
 def generar_codigo():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -61,7 +126,6 @@ st.markdown("""
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
-    
     div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -94,20 +158,20 @@ st.title("🤝 PactaLoopa")
 if st.session_state.vista == "inicio":
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("✨ Crear Nuevo Pacto"): st.session_state.vista = "crear"; st.rerun()
+        if st.button(T["crear"]): st.session_state.vista = "crear"; st.rerun()
     with col2:
-        if st.button("🤝 Entrar a un Pacto"): st.session_state.vista = "unirse"; st.rerun()
+        if st.button(T["unirse"]): st.session_state.vista = "unirse"; st.rerun()
 
 elif st.session_state.vista == "crear":
-    if st.button("⬅️ Volver"): st.session_state.vista = "inicio"; st.rerun()
-    nombre = st.text_input("Nombre del Pacto")
-    monto = st.number_input("Cuota ($)", min_value=1, value=100)
-    frecuencia = st.selectbox("Frecuencia", ["Semanal", "Quincenal", "Mensual"])
-    fecha_inicio = st.date_input("Primer pozo", value=date.today())
+    if st.button(T["volver"]): st.session_state.vista = "inicio"; st.rerun()
+    nombre = st.text_input(T["nombre_pacto"])
+    monto = st.number_input(T["cuota"], min_value=1, value=100)
+    frecuencia = st.selectbox(T["frecuencia"], ["Semanal", "Quincenal", "Mensual"])
+    fecha_inicio = st.date_input(T["primer_pozo"], value=date.today())
     pwd = st.text_input("Pass Admin", type="password")
-    admin_n = st.text_input("Tu nombre").strip()
+    admin_n = st.text_input(T["tu_nombre"]).strip()
     
-    if st.button("Crear Pacto"):
+    if st.button(T["btn_crear"]):
         if nombre and admin_n and pwd:
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
@@ -117,9 +181,9 @@ elif st.session_state.vista == "crear":
             st.rerun()
 
 elif st.session_state.vista == "unirse":
-    if st.button("⬅️ Volver"): st.session_state.vista = "inicio"; st.rerun()
+    if st.button(T["volver"]): st.session_state.vista = "inicio"; st.rerun()
     c_in = st.text_input("Código del Pacto").upper().strip()
-    if st.button("Buscar Pacto"):
+    if st.button(T["buscar"]):
         g = supabase.table("grupos").select("*").eq("codigo", c_in).execute()
         if g.data:
             st.session_state.grupo_id = g.data[0]['id']
@@ -132,19 +196,19 @@ elif st.session_state.vista == "seleccionar_usuario":
     grupo = g_db.data[0]
     nombres = [p['nombre_usuario'] for p in p_db.data]
     
-    sel = st.selectbox("¿Quién eres?", ["-- Seleccionar --", "-- Nuevo Miembro --"] + nombres)
+    sel = st.selectbox(T["quien_eres"], [T["seleccionar"], T["nuevo_miembro"]] + nombres)
     
-    if sel == "-- Nuevo Miembro --":
-        n = st.text_input("Tu nombre").strip()
-        if st.button("Unirme") and n:
+    if sel == T["nuevo_miembro"]:
+        n = st.text_input(T["tu_nombre"]).strip()
+        if st.button(T["btn_unirme"]) and n:
             max_p = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
             supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": n, "posicion_orden": max_p + 1}).execute()
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
             
-    elif sel != "-- Seleccionar --":
+    elif sel != T["seleccionar"]:
         st.info("Deja la contraseña en blanco si eres un miembro normal.")
-        p_check = st.text_input("Contraseña (Solo Administrador)", type="password")
-        if st.button("Entrar al Dashboard"):
+        p_check = st.text_input(T["pass_admin_label"], type="password")
+        if st.button(T["btn_entrar"]):
             is_adm = (p_check == grupo['password'])
             st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": is_adm})
             st.rerun()
@@ -163,8 +227,8 @@ elif st.session_state.vista == "dashboard":
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
     ucol1, ucol2 = st.columns([3, 1])
-    ucol1.markdown(f"**👤 Usuario:** {st.session_state.mi_nombre} {' (🛡️ Admin)' if st.session_state.es_admin else ''}")
-    if ucol2.button("🚪 Salir"):
+    ucol1.markdown(f"**👤 {T['usuario']}:** {st.session_state.mi_nombre} {' (🛡️ '+T['admin_tag']+')' if st.session_state.es_admin else ''}")
+    if ucol2.button(T["salir"]):
         st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None, "es_admin": False})
         st.rerun()
     
@@ -185,22 +249,16 @@ elif st.session_state.vista == "dashboard":
     
     opciones = [f"P{i+1}: {p['nombre_usuario']}" for i, p in enumerate(participantes)]
     if not opciones:
-        st.info("Esperando a que se unan miembros...")
+        st.info("Waiting for members...")
         st.stop()
     
-    with st.expander(f"📅 Ver Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
-        idx_p = st.radio(
-            "Selecciona un periodo:",
-            range(len(opciones)),
-            format_func=lambda x: opciones[x],
-            index=int(st.session_state.periodo_seleccionado),
-            label_visibility="collapsed"
-        )
+    with st.expander(f"📅 {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
+        idx_p = st.radio("Period:", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado), label_visibility="collapsed")
         if idx_p != st.session_state.periodo_seleccionado:
             st.session_state.periodo_seleccionado = idx_p
             st.rerun()
 
-    t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Gestión" if st.session_state.es_admin else "ℹ️ Info"])
+    t1, t2, t3 = st.tabs([T["tab_loop"], T["tab_pago"], T["tab_gestion"] if st.session_state.es_admin else T["tab_info"]])
 
     with t1:
         benef = participantes[idx_p]
@@ -209,10 +267,10 @@ elif st.session_state.vista == "dashboard":
         
         st.markdown(f"""
         <div class="info-card">
-            👤 <b>Recibe Pozo:</b> {benef['nombre_usuario']}<br>
-            🗓️ <b>Fecha Estimada:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
-            ⏳ <b>Estado:</b> {"¡Periodo Activo!" if dias_restantes <= 0 else f"Faltan {dias_restantes} días"}
-            <br>💰 <b>Pozo Total:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
+            👤 <b>{T['recibe']}:</b> {benef['nombre_usuario']}<br>
+            🗓️ <b>{T['fecha_est']}:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
+            ⏳ <b>{T['estado']}:</b> {T['activo'] if dias_restantes <= 0 else f"{T['faltan']} {dias_restantes} {T['dias']}"}
+            <br>💰 <b>{T['pozo_total']}:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -231,33 +289,30 @@ elif st.session_state.vista == "dashboard":
             
             if not puede_avisar:
                 fecha_apertura = fecha_p - timedelta(days=5)
-                st.info(f"🛡️ **Reporte pendiente.** Podrás avisar tu pago a partir del **{fecha_apertura.strftime('%d/%m/%Y')}** (5 días antes del pozo).")
+                st.info(f"🛡️ Podrás avisar a partir del **{fecha_apertura.strftime('%d/%m/%Y')}**.")
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
-                st.success("✨ ¡En este periodo tú recibes el pozo!")
+                st.success("✨ You receive the pool this period!")
             else:
                 if ha_pagado_periodo(yo, idx_p): 
-                    st.success("✅ Tu pago ha sido confirmado por el administrador.")
+                    st.success("✅ Confirmed.")
                 elif ha_avisado_periodo(yo, idx_p): 
-                    st.warning("🔔 Ya avisaste tu pago. Esperando validación.")
+                    st.warning("🔔 Waiting validation.")
                 else:
-                    st.write(f"Cuota a pagar: **${grupo['monto_cuota']}**")
-                    st.caption(f"El pozo se entrega el {fecha_p.strftime('%d/%m/%Y')}")
-                    if st.button("📢 YA PAGUÉ"):
+                    st.write(f"{T['cuota']}: **${grupo['monto_cuota']}**")
+                    if st.button(T["ya_pague"]):
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
                         if str(idx_p) not in avisos:
                             avisos.append(str(idx_p))
-                            lista_avisos = ",".join(filter(None, avisos))
-                            supabase.table("participantes").update({"periodos_avisados": lista_avisos}).eq("id", yo['id']).execute()
-                            st.toast("Aviso enviado al administrador")
+                            supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute()
+                            st.toast("Sent")
                             st.rerun()
 
     with t3:
         if st.session_state.es_admin:
             st.subheader("Validar Pagos")
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
-            if not pendientes: st.info("Sin avisos pendientes en este periodo.")
             for p in pendientes:
-                if st.button(f"Confirmar pago de {p['nombre_usuario']}"):
+                if st.button(f"Confirm {p['nombre_usuario']}"):
                     avisos = str(p.get('periodos_avisados', "")).split(",")
                     pagos = str(p.get('periodos_pagados', "")).split(",")
                     if str(idx_p) in avisos: avisos.remove(str(idx_p))
@@ -265,7 +320,7 @@ elif st.session_state.vista == "dashboard":
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
-            st.subheader("Gestionar Orden")
+            st.subheader("Order")
             for i, p in enumerate(participantes):
                 with st.container():
                     st.markdown('<div class="member-card">', unsafe_allow_html=True)
@@ -280,12 +335,8 @@ elif st.session_state.vista == "dashboard":
                     if p['nombre_usuario'] != st.session_state.mi_nombre and c3.button("❌", key=f"r{p['id']}"):
                         supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-
-            st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
-            if st.button("🗑️ ELIMINAR TODO EL PACTO"):
-                confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
-            st.markdown('</div>', unsafe_allow_html=True)
+            if st.button("🗑️ DELETE PACT"): confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
         else:
-            st.subheader("ℹ️ Info del Pacto")
-            st.write(f"**Código de Acceso:** `{grupo['codigo']}`")
-            st.write(f"**Cuota Individual:** ${grupo['monto_cuota']}")
+            st.subheader(T["tab_info"])
+            st.write(f"**Code:** `{grupo['codigo']}`")
+            st.write(f"**{T['cuota']}:** ${grupo['monto_cuota']}")
