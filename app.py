@@ -62,17 +62,6 @@ st.markdown("""
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
     
-    /* Barra de usuario superior */
-    .user-bar {
-        background-color: #f1f3f4;
-        padding: 8px 15px;
-        border-radius: 30px;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
     div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -144,17 +133,22 @@ elif st.session_state.vista == "seleccionar_usuario":
     nombres = [p['nombre_usuario'] for p in p_db.data]
     
     sel = st.selectbox("¿Quién eres?", ["-- Seleccionar --", "-- Nuevo Miembro --"] + nombres)
+    
     if sel == "-- Nuevo Miembro --":
         n = st.text_input("Tu nombre").strip()
         if st.button("Unirme") and n:
             max_p = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
             supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": n, "posicion_orden": max_p + 1}).execute()
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
+            
     elif sel != "-- Seleccionar --":
-        p_check = st.text_input("Pass Admin (Opcional)", type="password", help="Solo si eres el administrador")
-        if st.button("Entrar"):
+        # LOGICA CORREGIDA: Contraseña solo requerida para modo Admin
+        st.info("Deja la contraseña en blanco si eres un miembro normal.")
+        p_check = st.text_input("Contraseña (Solo Administrador)", type="password")
+        if st.button("Entrar al Dashboard"):
             is_adm = (p_check == grupo['password'])
-            st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": is_adm}); st.rerun()
+            st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": is_adm})
+            st.rerun()
 
 # --- DASHBOARD ---
 elif st.session_state.vista == "dashboard":
@@ -169,17 +163,17 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
-    # BARRA DE USUARIO INTEGRADA (Reemplaza al sidebar)
+    # BARRA DE USUARIO SUPERIOR (Sin Sidebar)
     ucol1, ucol2 = st.columns([3, 1])
-    ucol1.markdown(f"**👤 Usuario:** {st.session_state.mi_nombre} {' (Admin)' if st.session_state.es_admin else ''}")
-    if ucol2.button("🚪 Salir", key="logout_btn", help="Cerrar sesión"):
-        st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None})
+    ucol1.markdown(f"**👤 Usuario:** {st.session_state.mi_nombre} {' (🛡️ Admin)' if st.session_state.es_admin else ''}")
+    if ucol2.button("🚪 Salir"):
+        st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None, "es_admin": False})
         st.rerun()
     
     st.markdown("---")
-    st.write(f"### 🛡️ {grupo['nombre']}")
+    st.write(f"### {grupo['nombre']}")
 
-    # SELECCIÓN AUTOMÁTICA AL INICIO
+    # SELECCIÓN AUTOMÁTICA DEL PERIODO CERCANO
     hoy = date.today()
     if st.session_state.periodo_seleccionado is None:
         mejor_idx = 0
@@ -197,8 +191,8 @@ elif st.session_state.vista == "dashboard":
         st.info("Esperando a que se unan miembros...")
         st.stop()
     
-    # --- SELECTOR DE PERIODO PROTEGIDO ---
-    with st.expander(f"📅 Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
+    # SELECTOR DE PERIODO
+    with st.expander(f"📅 Ver Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
         idx_p = st.radio(
             "Selecciona un periodo:",
             range(len(opciones)),
@@ -210,7 +204,7 @@ elif st.session_state.vista == "dashboard":
             st.session_state.periodo_seleccionado = idx_p
             st.rerun()
 
-    t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if st.session_state.es_admin else "ℹ️ Info"])
+    t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Gestión" if st.session_state.es_admin else "ℹ️ Info"])
 
     with t1:
         benef = participantes[idx_p]
@@ -237,14 +231,14 @@ elif st.session_state.vista == "dashboard":
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
             if (fecha_p - hoy).days > 0:
-                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago de este periodo el **{fecha_p.strftime('%d/%m/%Y')}**.")
+                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago el **{fecha_p.strftime('%d/%m/%Y')}**.")
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
                 st.success("✨ ¡En este periodo tú recibes el pozo!")
             else:
                 if ha_pagado_periodo(yo, idx_p): 
                     st.success("✅ Tu pago ha sido confirmado.")
                 elif ha_avisado_periodo(yo, idx_p): 
-                    st.warning("🔔 Ya avisaste tu pago. Esperando validación.")
+                    st.warning("🔔 Ya avisaste tu pago. Esperando validación del Admin.")
                 else:
                     st.write(f"Cuota a pagar: **${grupo['monto_cuota']}**")
                     if st.button("📢 YA PAGUÉ"):
