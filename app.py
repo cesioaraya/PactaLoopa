@@ -61,6 +61,8 @@ st.markdown("""
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
     .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
+    /* Estilo para que el radio se vea más limpio */
+    div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -110,7 +112,6 @@ elif st.session_state.vista == "crear":
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
             gid = res.data[0]['id']
-            # Admin inicia al final, editable
             supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 999}).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": admin_n, "vista": "dashboard", "nuevo_codigo": cod, "nueva_pass": pwd, "mostrar_exito": True, "es_admin": True})
             st.rerun()
@@ -181,9 +182,19 @@ elif st.session_state.vista == "dashboard":
     if not opciones:
         st.info("Esperando a que se unan miembros...")
         st.stop()
-        
-    idx_p = st.selectbox("Ver Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
-    st.session_state.periodo_seleccionado = idx_p
+    
+    # --- SELECTOR DE PERIODO PROTEGIDO (No editable por teclado) ---
+    with st.expander(f"📅 Periodo: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
+        idx_p = st.radio(
+            "Selecciona un periodo:",
+            range(len(opciones)),
+            format_func=lambda x: opciones[x],
+            index=int(st.session_state.periodo_seleccionado),
+            label_visibility="collapsed"
+        )
+        if idx_p != st.session_state.periodo_seleccionado:
+            st.session_state.periodo_seleccionado = idx_p
+            st.rerun()
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if st.session_state.es_admin else "ℹ️ Info"])
 
@@ -211,14 +222,13 @@ elif st.session_state.vista == "dashboard":
     with t2:
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
-            # BLOQUEO DE PAGOS FUTUROS
             if (fecha_p - hoy).days > 0:
-                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago de este periodo a partir del **{fecha_p.strftime('%d/%m/%Y')}**.")
+                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago de este periodo el **{fecha_p.strftime('%d/%m/%Y')}**.")
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
                 st.success("✨ ¡En este periodo tú recibes el pozo!")
             else:
                 if ha_pagado_periodo(yo, idx_p): 
-                    st.success("✅ Tu pago ha sido confirmado por el administrador.")
+                    st.success("✅ Tu pago ha sido confirmado.")
                 elif ha_avisado_periodo(yo, idx_p): 
                     st.warning("🔔 Ya avisaste tu pago. Esperando validación.")
                 else:
@@ -233,7 +243,7 @@ elif st.session_state.vista == "dashboard":
         if st.session_state.es_admin:
             st.subheader("Validar Pagos del Periodo")
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
-            if not pendientes: st.info("No hay avisos de pago pendientes para este periodo.")
+            if not pendientes: st.info("Sin avisos pendientes en este periodo.")
             for p in pendientes:
                 if st.button(f"Confirmar pago de {p['nombre_usuario']}"):
                     avisos = str(p.get('periodos_avisados', "")).split(",")
@@ -243,7 +253,7 @@ elif st.session_state.vista == "dashboard":
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
-            st.subheader("Gestionar Orden de Miembros")
+            st.subheader("Gestionar Orden")
             for i, p in enumerate(participantes):
                 with st.container():
                     st.markdown('<div class="member-card">', unsafe_allow_html=True)
