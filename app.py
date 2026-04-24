@@ -174,11 +174,21 @@ elif st.session_state.vista == "dashboard":
 
     st.write(f"### 🛡️ {grupo['nombre']}")
     
-    # Selector de periodo mejorado
+    # --- BLOQUE CORREGIDO PARA EVITAR EL ERROR ---
     opciones = [f"P{i+1}: {p['nombre_usuario']}" for i, p in enumerate(participantes)]
-    if st.session_state.periodo_seleccionado is None: st.session_state.periodo_seleccionado = 0
-    idx_p = st.selectbox("Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=st.session_state.periodo_seleccionado)
+    
+    # 1. Si no hay participantes, detenemos la ejecución para evitar que selectbox falle
+    if not opciones:
+        st.info("Esperando a que se unan miembros...")
+        st.stop()
+        
+    # 2. Validamos que el índice guardado esté dentro del rango actual de participantes
+    if st.session_state.periodo_seleccionado is None or st.session_state.periodo_seleccionado >= len(opciones):
+        st.session_state.periodo_seleccionado = 0
+    
+    idx_p = st.selectbox("Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
     st.session_state.periodo_seleccionado = idx_p
+    # ---------------------------------------------
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if st.session_state.es_admin else "ℹ️ Info"])
 
