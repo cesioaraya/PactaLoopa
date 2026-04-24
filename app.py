@@ -33,6 +33,50 @@ LANGS = {
         "activo": "Period Active!", "faltan": "Missing", "dias": "days", "ya_pague": "📢 I'VE PAID",
         "admin_tag": "Admin", "tab_loop": "🔄 The Loop", "tab_pago": "💰 My Payment", "tab_gestion": "⚙️ Manage", "tab_info": "ℹ️ Info"
     },
+    "Português": {
+        "crear": "✨ Criar Novo Pacto", "unirse": "🤝 Entrar num Pacto", "volver": "⬅️ Voltar",
+        "nombre_pacto": "Nome do Pacto", "cuota": "Quota ($)", "frecuencia": "Frequência",
+        "primer_pozo": "Primeira Coleta", "tu_nombre": "Seu nome", "btn_crear": "Criar Pacto",
+        "buscar": "Buscar Pacto", "quien_eres": "Quem é você?", "nuevo_miembro": "-- Novo Membro --",
+        "seleccionar": "-- Selecionar --", "btn_unirme": "Participar", "pass_admin_label": "Senha (Admin)",
+        "btn_entrar": "Entrar no Painel", "usuario": "Usuário", "salir": "🚪 Sair",
+        "recibe": "Recebe o Fundo", "fecha_est": "Data Estimada", "estado": "Status", "pozo_total": "Total do Fundo",
+        "activo": "Período Ativo!", "faltan": "Faltam", "dias": "dias", "ya_pague": "📢 JÁ PAGUEI",
+        "admin_tag": "Admin", "tab_loop": "🔄 O Loop", "tab_pago": "💰 Meu Pagamento", "tab_gestion": "⚙️ Gestão", "tab_info": "ℹ️ Info"
+    },
+    "العربية": {
+        "crear": "✨ إنشاء ميثاق جديد", "unirse": "🤝 انضمام للميثاق", "volver": "⬅️ عودة",
+        "nombre_pacto": "اسم الميثاق", "cuota": "القسط ($)", "frecuencia": "التكرار",
+        "primer_pozo": "موعد أول جمعية", "tu_nombre": "اسمك", "btn_crear": "إنشاء الميثاق",
+        "buscar": "بحث عن ميثاق", "quien_eres": "من أنت؟", "nuevo_miembro": "-- عضو جديد --",
+        "seleccionar": "-- اختر --", "btn_unirme": "انضمام", "pass_admin_label": "كلمة المرور (للمسؤول فقط)",
+        "btn_entrar": "دخول لوحة التحكم", "usuario": "المستخدم", "salir": "🚪 خروج",
+        "recibe": "يستلم الجمعية", "fecha_est": "التاريخ المتوقع", "estado": "الحالة", "pozo_total": "إجمالي المبلغ",
+        "activo": "الفترة نشطة!", "faltan": "متبقي", "dias": "أيام", "ya_pague": "📢 لقد دفعت",
+        "admin_tag": "مسؤول", "tab_loop": "🔄 الحلقة", "tab_pago": "💰 دفعي", "tab_gestion": "⚙️ إدارة", "tab_info": "ℹ️ معلومات"
+    },
+    "Tagalog": {
+        "crear": "✨ Gumawa ng Paluwagan", "unirse": "🤝 Sumali sa Paluwagan", "volver": "⬅️ Bumalik",
+        "nombre_pacto": "Pangalan ng Paluwagan", "cuota": "Hulog ($)", "frecuencia": "Dalas",
+        "primer_pozo": "Unang Sahod", "tu_nombre": "Pangalan mo", "btn_crear": "Gumawa",
+        "buscar": "Maghanap", "quien_eres": "Sino ka?", "nuevo_miembro": "-- Bagong Miyembro --",
+        "seleccionar": "-- Pumili --", "btn_unirme": "Sali", "pass_admin_label": "Password (Admin)",
+        "btn_entrar": "Pumasok sa Dashboard", "usuario": "User", "salir": "🚪 Logout",
+        "recibe": "Tatanggap ng Sahod", "fecha_est": "Inaasahang Petsa", "estado": "Status", "pozo_total": "Kabuuang Sahod",
+        "activo": "Aktibo ang Panahon!", "faltan": "Kulang ng", "dias": "araw", "ya_pague": "📢 NAGBAYAD NA AKO",
+        "admin_tag": "Admin", "tab_loop": "🔄 Ang Loop", "tab_pago": "💰 Bayad Ko", "tab_gestion": "⚙️ Pamamahala", "tab_info": "ℹ️ Impormasyon"
+    },
+    "Bahasa Indonesia": {
+        "crear": "✨ Buat Arisan Baru", "unirse": "🤝 Gabung Arisan", "volver": "⬅️ Kembali",
+        "nombre_pacto": "Nama Arisan", "cuota": "Iuran ($)", "frecuencia": "Frekuensi",
+        "primer_pozo": "Tanggal Kocokan Pertama", "tu_nombre": "Nama Anda", "btn_crear": "Buat Arisan",
+        "buscar": "Cari Arisan", "quien_eres": "Siapa Anda?", "nuevo_miembro": "-- Anggota Baru --",
+        "seleccionar": "-- Pilih --", "btn_unirme": "Gabung", "pass_admin_label": "Kata Sandi (Admin Saja)",
+        "btn_entrar": "Masuk Dashboard", "usuario": "Pengguna", "salir": "🚪 Keluar",
+        "recibe": "Penerima Arisan", "fecha_est": "Estimasi Tanggal", "estado": "Status", "pozo_total": "Total Dana",
+        "activo": "Periode Aktif!", "faltan": "Kurang", "dias": "hari", "ya_pague": "📢 SAYA SUDAH BAYAR",
+        "admin_tag": "Admin", "tab_loop": "🔄 Loop", "tab_pago": "💰 Pembayaran Saya", "tab_gestion": "⚙️ Kelola", "tab_info": "ℹ️ Info"
+    },
     "Français": {
         "crear": "✨ Créer un Pacte", "unirse": "🤝 Rejoindre un Pacte", "volver": "⬅️ Retour",
         "nombre_pacto": "Nom du Pacte", "cuota": "Cotisation ($)", "frecuencia": "Fréquence",
@@ -43,6 +87,28 @@ LANGS = {
         "recibe": "Reçoit le Pot", "fecha_est": "Date Estimée", "estado": "État", "pozo_total": "Total du Pot",
         "activo": "Période Active!", "faltan": "Il reste", "dias": "jours", "ya_pague": "📢 J'AI PAYÉ",
         "admin_tag": "Admin", "tab_loop": "🔄 Le Loop", "tab_pago": "💰 Mon Paiement", "tab_gestion": "⚙️ Gestion", "tab_info": "ℹ️ Info"
+    },
+    "Tiếng Việt": {
+        "crear": "✨ Tạo Nhóm Hụi", "unirse": "🤝 Tham Gia Nhóm", "volver": "⬅️ Quay lại",
+        "nombre_pacto": "Tên Nhóm", "cuota": "Tiền Đóng ($)", "frecuencia": "Tần suất",
+        "primer_pozo": "Ngày Hốt Đầu Tiên", "tu_nombre": "Tên của bạn", "btn_crear": "Tạo Nhóm",
+        "buscar": "Tìm Nhóm", "quien_eres": "Bạn là ai?", "nuevo_miembro": "-- Thành viên mới --",
+        "seleccionar": "-- Chọn --", "btn_unirme": "Tham gia", "pass_admin_label": "Mật khẩu (Admin)",
+        "btn_entrar": "Vào Bảng Điều Khiển", "usuario": "Người dùng", "salir": "🚪 Thoát",
+        "recibe": "Người Hốt Hụi", "fecha_est": "Ngày Dự Kiến", "estado": "Trạng thái", "pozo_total": "Tổng Tiền Hụi",
+        "activo": "Giai Đoạn Đang Hoạt Động!", "faltan": "Còn lại", "dias": "ngày", "ya_pague": "📢 TÔI ĐÃ ĐÓNG TIỀN",
+        "admin_tag": "Quản trị", "tab_loop": "🔄 Vòng Lặp", "tab_pago": "💰 Khoản Đóng", "tab_gestion": "⚙️ Quản lý", "tab_info": "ℹ️ Thông tin"
+    },
+    "Kiswahili": {
+        "crear": "✨ Anzisha Chama", "unirse": "🤝 Jiunge na Chama", "volver": "⬅️ Rudia",
+        "nombre_pacto": "Jina la Chama", "cuota": "Mchango ($)", "frecuencia": "Mzunguko",
+        "primer_pozo": "Tarehe ya Kwanza", "tu_nombre": "Jina lako", "btn_crear": "Anzisha",
+        "buscar": "Tafuta Chama", "quien_eres": "Wewe ni nani?", "nuevo_miembro": "-- Mwanachama Mpya --",
+        "seleccionar": "-- Chagua --", "btn_unirme": "Jiunge", "pass_admin_label": "Nywila (Admin Pekee)",
+        "btn_entrar": "Ingia Dashboard", "usuario": "Mtumiaji", "salir": "🚪 Ondoka",
+        "recibe": "Anayepokea Fedha", "fecha_est": "Tarehe Inayotarajiwa", "estado": "Hali", "pozo_total": "Jumla ya Fedha",
+        "activo": "Kipindi Kipo Wazi!", "faltan": "Zimebaki", "dias": "siku", "ya_pague": "📢 NIMELIPA",
+        "admin_tag": "Admin", "tab_loop": "🔄 Mzunguko", "tab_pago": "💰 Malipo Yangu", "tab_gestion": "⚙️ Usimamizi", "tab_info": "ℹ️ Habari"
     },
     "中文": {
         "crear": "✨ 创建新协议", "unirse": "🤝 加入协议", "volver": "⬅️ 返回",
