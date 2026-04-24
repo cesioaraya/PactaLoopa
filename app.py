@@ -39,6 +39,15 @@ def calcular_fecha_periodo(fecha_inicio, indice, frecuencia):
     else:  # semanal
         return fecha_inicio + timedelta(days=indice * 7)
 
+# FUNCIONES DE APOYO PARA LOGICA DE PERIODOS
+def ha_pagado_periodo(p_data, idx_periodo):
+    pagos = str(p_data.get('periodos_pagados', "")).split(",")
+    return str(idx_periodo) in pagos
+
+def ha_avisado_periodo(p_data, idx_periodo):
+    avisos = str(p_data.get('periodos_avisados', "")).split(",")
+    return str(idx_periodo) in avisos
+
 # 3. ESTILO
 st.markdown("""
     <style>
@@ -100,7 +109,7 @@ elif st.session_state.vista == "crear":
             gid = res.data[0]['id']
             supabase.table("participantes").insert({
                 "grupo_id": gid, "nombre_usuario": tu_nombre, 
-                "posicion_orden": 0, "pago_cuota": False, "recibio_pozo": False
+                "posicion_orden": 0, "recibio_pozo": False
             }).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": tu_nombre, "vista": "dashboard", "mostrar_exito": True, "nuevo_codigo": codigo, "nueva_pass": pass_pacto})
             st.rerun()
@@ -132,10 +141,9 @@ elif st.session_state.vista == "seleccionar_usuario":
         nuevo = st.text_input("Tu nombre").strip()
         if st.button("Unirme") and nuevo:
             max_pos = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
-            supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": nuevo, "posicion_orden": max_pos + 1, "pago_cuota": False, "recibio_pozo": False}).execute()
+            supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": nuevo, "posicion_orden": max_pos + 1, "recibio_pozo": False}).execute()
             st.session_state.mi_nombre = nuevo; st.session_state.vista = "dashboard"; st.rerun()
     elif sel != "-- Seleccionar --":
-        # Si es admin, pedir contraseña
         if sel == admin_nombre:
             pass_check = st.text_input("Contraseña de Administrador", type="password")
             if st.button("Acceder como Admin"):
@@ -175,7 +183,6 @@ elif st.session_state.vista == "dashboard":
     beneficiario_p = participantes[idx_p] if idx_p < len(participantes) else participantes[0]
     fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
     
-    # Cálculo días restantes
     dias_restantes = (fecha_p - date.today()).days
     txt_restantes = f"{dias_restantes} días" if dias_restantes > 0 else "¡Hoy!" if dias_restantes == 0 else "Finalizado"
 
@@ -198,8 +205,9 @@ elif st.session_state.vista == "dashboard":
             with col_p:
                 if p == beneficiario_p: st.caption("Beneficiario")
                 else:
-                    status = "PAGADO" if p.get('pago_cuota') else "PENDIENTE"
-                    clase = "pago-si" if p.get('pago_cuota') else "pago-no"
+                    pagado = ha_pagado_periodo(p, idx_p)
+                    status = "PAGADO" if pagado else "PENDIENTE"
+                    clase = "pago-si" if pagado else "pago-no"
                     st.markdown(f"<span class='status-badge {clase}'>{status}</span>", unsafe_allow_html=True)
 
     with t2:
@@ -208,21 +216,27 @@ elif st.session_state.vista == "dashboard":
             if yo['nombre_usuario'] == beneficiario_p['nombre_usuario']:
                 st.success("En este periodo tú recibes el pozo. No debes reportar pago.")
             else:
-                if yo.get('pago_cuota'): st.success("✅ Tu cuota ya está marcada como pagada.")
-                elif yo.get('aviso_pago'):
+                pagado = ha_pagado_periodo(yo, idx_p)
+                avisado = ha_avisado_periodo(yo, idx_p)
+                
+                if pagado: st.success("✅ Tu cuota ya está marcada como pagada para este periodo.")
+                elif avisado:
                     st.warning("🔔 Pago reportado. Esperando validación.")
                     if st.button("Cancelar Reporte"):
-                        supabase.table("participantes").update({"aviso_pago": False}).eq("id", yo['id']).execute(); st.rerun()
+                        avisos = str(yo.get('periodos_avisados', "")).split(",")
+                        if str(idx_p) in avisos: avisos.remove(str(idx_p))
+                        supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
                 else:
                     st.info(f"Monto: **${grupo['monto_cuota']}**")
                     if st.button("📢 INFORMAR QUE YA PAGUÉ"):
-                        supabase.table("participantes").update({"aviso_pago": True}).eq("id", yo['id']).execute(); st.rerun()
+                        avisos = str(yo.get('periodos_avisados', "")).split(",")
+                        if str(idx_p) not in avisos: avisos.append(str(idx_p))
+                        supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
 
     with t3:
         if es_admin:
             st.subheader("🔑 Credenciales del Grupo")
             st.code(f"Código: {grupo['codigo']}\nContraseña: {grupo['password']}", language=None)
-            
             st.write("---")
             st.subheader("👥 Gestión de Miembros")
             for i, p in enumerate(participantes):
@@ -243,13 +257,23 @@ elif st.session_state.vista == "dashboard":
                         supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
 
             st.write("---")
-            st.subheader("✅ Validar Pagos")
-            avisos = [p for p in participantes if p.get('aviso_pago')]
-            if avisos:
-                for a in avisos:
+            st.subheader(f"✅ Validar Pagos Periodo {idx_p + 1}")
+            # Solo muestra quienes avisaron para el periodo seleccionado actualmente
+            avisos_periodo = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
+            if avisos_periodo:
+                for a in avisos_periodo:
                     if st.button(f"Confirmar pago de {a['nombre_usuario']}"):
-                        supabase.table("participantes").update({"aviso_pago": False, "pago_cuota": True}).eq("id", a['id']).execute(); st.rerun()
-            else: st.caption("Sin pagos pendientes.")
+                        # Mover de avisados a pagados para este periodo
+                        avisos = str(a.get('periodos_avisados', "")).split(",")
+                        pagos = str(a.get('periodos_pagados', "")).split(",")
+                        if str(idx_p) in avisos: avisos.remove(str(idx_p))
+                        if str(idx_p) not in pagos: pagos.append(str(idx_p))
+                        
+                        supabase.table("participantes").update({
+                            "periodos_avisados": ",".join(filter(None, avisos)),
+                            "periodos_pagados": ",".join(filter(None, pagos))
+                        }).eq("id", a['id']).execute(); st.rerun()
+            else: st.caption(f"Sin pagos pendientes para el Periodo {idx_p + 1}.")
 
             st.markdown('<div class="danger-zone">', unsafe_allow_html=True)
             if st.button("ELIMINAR TODO EL LOOP"):
