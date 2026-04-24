@@ -110,7 +110,7 @@ elif st.session_state.vista == "crear":
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
             gid = res.data[0]['id']
-            # Admin inicia en posición 999 (al final), pero es editable
+            # Admin inicia al final, editable
             supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 999}).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": admin_n, "vista": "dashboard", "nuevo_codigo": cod, "nueva_pass": pwd, "mostrar_exito": True, "es_admin": True})
             st.rerun()
@@ -141,10 +141,8 @@ elif st.session_state.vista == "seleccionar_usuario":
     elif sel != "-- Seleccionar --":
         p_check = st.text_input("Pass Admin (Opcional)", type="password")
         if st.button("Entrar"):
-            if p_check == grupo['password']:
-                st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": True}); st.rerun()
-            else:
-                st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": False}); st.rerun()
+            is_adm = (p_check == grupo['password'])
+            st.session_state.update({"mi_nombre": sel, "vista": "dashboard", "es_admin": is_adm}); st.rerun()
 
 # --- DASHBOARD ---
 elif st.session_state.vista == "dashboard":
@@ -159,7 +157,7 @@ elif st.session_state.vista == "dashboard":
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
     f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
 
-    # LÓGICA DE SELECCIÓN AUTOMÁTICA DE PERIODO
+    # SELECCIÓN AUTOMÁTICA AL INICIO
     hoy = date.today()
     if st.session_state.periodo_seleccionado is None:
         mejor_idx = 0
@@ -184,7 +182,7 @@ elif st.session_state.vista == "dashboard":
         st.info("Esperando a que se unan miembros...")
         st.stop()
         
-    idx_p = st.selectbox("Seleccionar Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
+    idx_p = st.selectbox("Ver Periodo", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado))
     st.session_state.periodo_seleccionado = idx_p
 
     t1, t2, t3 = st.tabs(["🔄 El Loop", "💰 Mi Pago", "⚙️ Admin" if st.session_state.es_admin else "ℹ️ Info"])
@@ -193,14 +191,13 @@ elif st.session_state.vista == "dashboard":
         benef = participantes[idx_p]
         fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
         dias_restantes = (fecha_p - hoy).days
-        txt_restantes = f"{dias_restantes} días" if dias_restantes > 0 else "¡Hoy!" if dias_restantes == 0 else "Finalizado"
-
+        
         st.markdown(f"""
         <div class="info-card">
             👤 <b>Recibe Pozo:</b> {benef['nombre_usuario']}<br>
             🗓️ <b>Fecha Estimada:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
-            ⏳ <b>Faltan:</b> {txt_restantes}<br>
-            💰 <b>Pozo:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
+            ⏳ <b>Estado:</b> {"¡Periodo Activo!" if dias_restantes <= 0 else f"Faltan {dias_restantes} días"}<br>
+            💰 <b>Pozo Total:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
         </div>
         """, unsafe_allow_html=True)
 
@@ -214,16 +211,18 @@ elif st.session_state.vista == "dashboard":
     with t2:
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
-            es_futuro = (fecha_p - hoy).days > 0
-            
-            if yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
-                st.success("¡Este periodo cobras tú!")
-            elif es_futuro:
-                st.info(f"El reporte para este periodo se habilitará el {fecha_p.strftime('%d/%m/%Y')}.")
+            # BLOQUEO DE PAGOS FUTUROS
+            if (fecha_p - hoy).days > 0:
+                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago de este periodo a partir del **{fecha_p.strftime('%d/%m/%Y')}**.")
+            elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
+                st.success("✨ ¡En este periodo tú recibes el pozo!")
             else:
-                if ha_pagado_periodo(yo, idx_p): st.success("✅ Pago confirmado.")
-                elif ha_avisado_periodo(yo, idx_p): st.warning("🔔 Esperando validación del Admin.")
+                if ha_pagado_periodo(yo, idx_p): 
+                    st.success("✅ Tu pago ha sido confirmado por el administrador.")
+                elif ha_avisado_periodo(yo, idx_p): 
+                    st.warning("🔔 Ya avisaste tu pago. Esperando validación.")
                 else:
+                    st.write(f"Cuota a pagar: **${grupo['monto_cuota']}**")
                     if st.button("📢 YA PAGUÉ"):
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
                         if str(idx_p) not in avisos:
@@ -232,8 +231,9 @@ elif st.session_state.vista == "dashboard":
 
     with t3:
         if st.session_state.es_admin:
-            st.subheader("Validar Pagos")
+            st.subheader("Validar Pagos del Periodo")
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
+            if not pendientes: st.info("No hay avisos de pago pendientes para este periodo.")
             for p in pendientes:
                 if st.button(f"Confirmar pago de {p['nombre_usuario']}"):
                     avisos = str(p.get('periodos_avisados', "")).split(",")
@@ -243,7 +243,7 @@ elif st.session_state.vista == "dashboard":
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
-            st.subheader("Gestionar Orden")
+            st.subheader("Gestionar Orden de Miembros")
             for i, p in enumerate(participantes):
                 with st.container():
                     st.markdown('<div class="member-card">', unsafe_allow_html=True)
