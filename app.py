@@ -227,26 +227,38 @@ elif st.session_state.vista == "dashboard":
                 pagado = ha_pagado_periodo(p, idx_p)
                 col_b.markdown(f"<span class='status-badge {'pago-si' if pagado else 'pago-no'}'>{'SÍ' if pagado else 'NO'}</span>", unsafe_allow_html=True)
 
-    with t2:
+with t2:
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
-            if (fecha_p - hoy).days > 0:
-                st.info(f"🛡️ **Reporte bloqueado.** Podrás avisar tu pago el **{fecha_p.strftime('%d/%m/%Y')}**.")
+            dias_para_el_pozo = (fecha_p - hoy).days
+            
+            # Permitimos avisar desde 5 días antes
+            puede_avisar = dias_para_el_pozo <= 5
+            
+            if not puede_avisar:
+                fecha_apertura = fecha_p - timedelta(days=5)
+                st.info(f"🛡️ **Reporte pendiente.** Podrás avisar tu pago a partir del **{fecha_apertura.strftime('%d/%m/%Y')}** (5 días antes del pozo).")
+            
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
                 st.success("✨ ¡En este periodo tú recibes el pozo!")
+            
             else:
                 if ha_pagado_periodo(yo, idx_p): 
-                    st.success("✅ Tu pago ha sido confirmado.")
+                    st.success("✅ Tu pago ha sido confirmado por el administrador.")
                 elif ha_avisado_periodo(yo, idx_p): 
-                    st.warning("🔔 Ya avisaste tu pago. Esperando validación del Admin.")
+                    st.warning("🔔 Ya avisaste tu pago. Esperando validación.")
                 else:
                     st.write(f"Cuota a pagar: **${grupo['monto_cuota']}**")
+                    st.caption(f"El pozo se entrega el {fecha_p.strftime('%d/%m/%Y')}")
                     if st.button("📢 YA PAGUÉ"):
                         avisos = str(yo.get('periodos_avisados', "")).split(",")
                         if str(idx_p) not in avisos:
                             avisos.append(str(idx_p))
-                            supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute(); st.rerun()
-
+                            # Limpiar strings vacíos y actualizar
+                            lista_avisos = ",".join(filter(None, avisos))
+                            supabase.table("participantes").update({"periodos_avisados": lista_avisos}).eq("id", yo['id']).execute()
+                            st.toast("Aviso enviado al administrador")
+                            st.rerun()
     with t3:
         if st.session_state.es_admin:
             st.subheader("Validar Pagos")
