@@ -337,7 +337,7 @@ elif st.session_state.vista == "dashboard":
             👤 <b>{T['recibe']}:</b> {benef['nombre_usuario']}<br>
             🗓️ <b>{T['fecha_est']}:</b> {fecha_p.strftime('%d/%m/%Y')}<br>
             ⏳ <b>{T['estado']}:</b> {T['activo'] if dias_restantes <= 0 else f"{T['faltan']} {dias_restantes} {T['dias']}"}
-            <br>💰 <b>{T['pozo_total']}:</b> ${grupo['monto_cuota'] * (len(participantes)-1)}
+            <br>💰 <b>{T['pozo_total']}:</b> ${grupo['monto_cuota'] * len(participantes)}
         </div>
         """, unsafe_allow_html=True)
 
