@@ -365,7 +365,7 @@ elif st.session_state.vista == "dashboard":
             col_a.write(f"{'🎁' if p == benef else '👤'} {p['nombre_usuario']}")
             if p != benef:
                 pagado = ha_pagado_periodo(p, idx_p)
-                col_b.markdown(f"<span class='status-badge {'pago-si' if pagado else 'pago-no'}'>{'SÍ' if pagado else 'NO'}</span>", unsafe_allow_html=True)
+                col_b.markdown(f"<span class='status-badge {'pago-si' if pagado else 'pago-no'}'>{'Pago' if pagado else 'Sin Pago'}</span>", unsafe_allow_html=True)
 
     with t2:
         if yo:
