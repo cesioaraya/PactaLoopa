@@ -5,7 +5,6 @@ import random
 import string
 from datetime import datetime, date, timedelta
 import calendar
-import streamlit as st
 
 # 1. CONFIGURACIÓN
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
@@ -18,37 +17,16 @@ st.markdown("""
     header {visibility: hidden;}
     .stDeployButton {display:none;}
     
-    /* Tu CSS anterior se mantiene */
     .stButton>button { border-radius: 20px; width: 100%; }
     .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
     .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
     .status-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
     .pago-si { background-color: #d4edda; color: #155724; }
     .pago-no { background-color: #fff3cd; color: #856404; }
+    .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
+    div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- LÓGICA DE PERSISTENCIA (URL) ---
-# Esto permite que si el usuario refresca, la app intente recuperar el grupo de la URL
-query_params = st.query_params
-if "g" in query_params and st.session_state.get("grupo_id") is None:
-    st.session_state.grupo_id = query_params["g"]
-    st.session_state.vista = "seleccionar_usuario"
-
-# ... (El resto de tu diccionario LANGS e init_connection se mantiene igual)
-
-# --- ACTUALIZACIÓN DE URL AL ENTRAR A UN PACTO ---
-# Busca donde asignas el grupo_id y añade esta línea:
-# st.query_params["g"] = gid 
-
-# Por ejemplo, en la sección de 'unirse' o 'crear':
-if st.button(T["btn_crear"]):
-    # ... tu lógica de creación ...
-    st.session_state.grupo_id = gid
-    st.query_params["g"] = gid # <-- ESTO GUARDA EL ID EN LA URL
-    st.rerun()
-
-# --- CONTINÚA TU CÓDIGO NORMALMENTE ---
 
 # --- DICCIONARIO DE IDIOMAS ---
 LANGS = {
@@ -126,7 +104,7 @@ LANGS = {
         "seleccionar": "-- Sélectionner --", "btn_unirme": "Rejoindre", "pass_admin_label": "Mot de Passe (Admin)",
         "btn_entrar": "Tableau de Bord", "usuario": "Utilisateur", "salir": "🚪 Quitter",
         "recibe": "Reçoit le Pot", "fecha_est": "Date Estimée", "estado": "État", "pozo_total": "Total du Pot",
-        "activo": "Période Active!", "faltan": "Il reste", "jours": "jours", "ya_pague": "📢 J'AI PAYÉ",
+        "activo": "Période Active!", "faltan": "Il reste", "dias": "jours", "ya_pague": "📢 J'AI PAYÉ",
         "admin_tag": "Admin", "tab_loop": "🔄 Le Loop", "tab_pago": "💰 Mon Paiement", "tab_gestion": "⚙️ Gestion", "tab_info": "ℹ️ Info"
     },
     "Tiếng Việt": {
@@ -149,7 +127,7 @@ LANGS = {
         "btn_entrar": "Ingia Dashboard", "usuario": "Mtumiaji", "salir": "🚪 Ondoka",
         "recibe": "Anayepokea Fedha", "fecha_est": "Tarehe Inayotarajiwa", "estado": "Hali", "pozo_total": "Jumla ya Fedha",
         "activo": "Kipindi Kipo Wazi!", "faltan": "Zimebaki", "dias": "siku", "ya_pague": "📢 NIMELIPA",
-        "admin_tag": "Admin", "tab_loop": "🔄 Mzunguko", "tab_pago": "💰 Malipo Yangu", "tab_gestion": "⚙️ Usimamizi", "tab_info": "ℹ️ Habari"
+        "admin_tag": "Admin", "tab_loop": "🔄 Mzunguko", "tab_pago": "💰 Malipo Yangu", "tab_gestion": "⚙️ Usimamizi", "tab_info": "Habari"
     },
     "中文": {
         "crear": "✨ 创建新协议", "unirse": "🤝 加入协议", "volver": "⬅️ 返回",
@@ -164,7 +142,7 @@ LANGS = {
     },
     "हिन्दी": {
         "crear": "✨ नया समझौता", "unirse": "🤝 समझौते में शामिल हों", "volver": "⬅️ वापस",
-        "nombre_pacto": "समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
+        "nombre_pacto": "समझ समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
         "primer_pozo": "पहला पूल", "tu_nombre": "आपका नाम", "btn_crear": "समझौता बनाएं",
         "buscar": "समझौता खोजें", "quien_eres": "आप कौन हैं?", "nuevo_miembro": "-- नया सदस्य --",
         "seleccionar": "-- चुनें --", "btn_unirme": "शामिल हों", "pass_admin_label": "पासवर्ड (केवल एडमिन)",
@@ -175,6 +153,29 @@ LANGS = {
     }
 }
 
+# 2. INICIALIZACIÓN DE ESTADO
+if "grupo_id" not in st.session_state:
+    # Persistencia vía URL
+    query_params = st.query_params
+    init_grupo = query_params.get("g", None)
+    st.session_state.update({
+        "grupo_id": init_grupo, 
+        "vista": "inicio" if not init_grupo else "seleccionar_usuario", 
+        "mi_nombre": "", 
+        "mostrar_exito": False, 
+        "nuevo_codigo": "", 
+        "periodo_seleccionado": None,
+        "es_admin": False,
+        "lang": "Español"
+    })
+
+# 3. LÓGICA DE IDIOMA (Definir T antes de usarlo)
+header_col1, header_col2 = st.columns([3, 1])
+with header_col2:
+    st.session_state.lang = st.selectbox("🌐", list(LANGS.keys()), index=list(LANGS.keys()).index(st.session_state.lang), label_visibility="collapsed")
+T = LANGS[st.session_state.lang]
+
+# 4. CONEXIÓN SUPABASE
 @st.cache_resource
 def init_connection():
     try:
@@ -187,24 +188,7 @@ def init_connection():
 
 supabase = init_connection()
 
-if "grupo_id" not in st.session_state:
-    st.session_state.update({
-        "grupo_id": None, 
-        "vista": "inicio", 
-        "mi_nombre": "", 
-        "mostrar_exito": False, 
-        "nuevo_codigo": "", 
-        "periodo_seleccionado": None,
-        "es_admin": False,
-        "lang": "Español"
-    })
-
-# --- SELECTOR DE IDIOMA ENCABEZADO ---
-header_col1, header_col2 = st.columns([3, 1])
-with header_col2:
-    st.session_state.lang = st.selectbox("🌐", list(LANGS.keys()), index=list(LANGS.keys()).index(st.session_state.lang), label_visibility="collapsed")
-T = LANGS[st.session_state.lang]
-
+# 5. FUNCIONES DE APOYO
 def generar_codigo():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
@@ -224,21 +208,7 @@ def ha_pagado_periodo(p_data, idx_periodo):
 def ha_avisado_periodo(p_data, idx_periodo):
     return str(idx_periodo) in str(p_data.get('periodos_avisados', "")).split(",")
 
-# --- ESTILOS ---
-st.markdown("""
-    <style>
-    .stButton>button { border-radius: 20px; width: 100%; }
-    .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
-    .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
-    .status-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
-    .pago-si { background-color: #d4edda; color: #155724; }
-    .pago-no { background-color: #fff3cd; color: #856404; }
-    .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
-    div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- DIÁLOGOS ---
+# 6. DIÁLOGOS
 @st.dialog("🚀 ¡Pacto Creado!")
 def mostrar_exito(codigo, password):
     st.write("Comparte los datos. Solo tú necesitas la contraseña.")
@@ -256,11 +226,12 @@ def confirmar_borrado_total(grupo_id, pass_real):
         if confirmacion == "ELIMINAR" and pass_check == pass_real:
             supabase.table("participantes").delete().eq("grupo_id", grupo_id).execute()
             supabase.table("grupos").delete().eq("id", grupo_id).execute()
+            st.query_params.clear()
             st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio"})
             st.rerun()
         else: st.error("Validación incorrecta.")
 
-# --- NAVEGACIÓN ---
+# 7. NAVEGACIÓN Y VISTAS
 st.title("🤝 PactaLoopa")
 
 if st.session_state.vista == "inicio":
@@ -285,6 +256,7 @@ elif st.session_state.vista == "crear":
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
             gid = res.data[0]['id']
             supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 999}).execute()
+            st.query_params["g"] = gid
             st.session_state.update({"grupo_id": gid, "mi_nombre": admin_n, "vista": "dashboard", "nuevo_codigo": cod, "nueva_pass": pwd, "mostrar_exito": True, "es_admin": True})
             st.rerun()
 
@@ -294,7 +266,9 @@ elif st.session_state.vista == "unirse":
     if st.button(T["buscar"]):
         g = supabase.table("grupos").select("*").eq("codigo", c_in).execute()
         if g.data:
-            st.session_state.grupo_id = g.data[0]['id']
+            gid = g.data[0]['id']
+            st.query_params["g"] = gid
+            st.session_state.grupo_id = gid
             st.session_state.vista = "seleccionar_usuario"; st.rerun()
         else: st.error("No se encontró ningún pacto con ese código.")
 
@@ -327,7 +301,10 @@ elif st.session_state.vista == "dashboard":
         mostrar_exito(st.session_state.nuevo_codigo, st.session_state.nueva_pass)
 
     g_res = supabase.table("grupos").select("*").eq("id", st.session_state.grupo_id).execute()
-    if not g_res.data: st.session_state.update({"grupo_id": None, "vista": "inicio"}); st.rerun()
+    if not g_res.data: 
+        st.query_params.clear()
+        st.session_state.update({"grupo_id": None, "vista": "inicio"}); st.rerun()
+    
     grupo = g_res.data[0]
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
@@ -337,6 +314,7 @@ elif st.session_state.vista == "dashboard":
     ucol1, ucol2 = st.columns([3, 1])
     ucol1.markdown(f"**👤 {T['usuario']}:** {st.session_state.mi_nombre} {' (🛡️ '+T['admin_tag']+')' if st.session_state.es_admin else ''}")
     if ucol2.button(T["salir"]):
+        st.query_params.clear()
         st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None, "es_admin": False})
         st.rerun()
     
@@ -427,7 +405,6 @@ elif st.session_state.vista == "dashboard":
                     if str(idx_p) not in pagos: pagos.append(str(idx_p))
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
-            # --- NUEVA SECCIÓN: CANCELAR CONFIRMACIÓN ---
             st.write("---")
             st.subheader("Pagos Confirmados")
             confirmados = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
@@ -438,7 +415,6 @@ elif st.session_state.vista == "dashboard":
                 if col_c2.button("Deshacer", key=f"undo_{p['id']}"):
                     pagos = str(p.get('periodos_pagados', "")).split(",")
                     if str(idx_p) in pagos: pagos.remove(str(idx_p))
-                    # Opcionalmente lo devolvemos a "avisado" o simplemente lo quitamos de pagado
                     supabase.table("participantes").update({"periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
             st.write("---")
@@ -463,8 +439,8 @@ elif st.session_state.vista == "dashboard":
             st.write(f"**Code:** `{grupo['codigo']}`")
             st.write(f"**{T['cuota']}:** ${grupo['monto_cuota']}")
 
-# --- Sección de Apoyo ---
-st.markdown("---") # Línea divisoria
+# --- APOYO ---
+st.markdown("---")
 st.markdown(
     """
     <div style="text-align: center;">
