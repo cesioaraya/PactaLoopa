@@ -5,9 +5,50 @@ import random
 import string
 from datetime import datetime, date, timedelta
 import calendar
+import streamlit as st
 
 # 1. CONFIGURACIÓN
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
+
+# --- BLOQUE DE LIMPIEZA VISUAL (OCULTAR GITHUB Y MENU) ---
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    
+    /* Tu CSS anterior se mantiene */
+    .stButton>button { border-radius: 20px; width: 100%; }
+    .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
+    .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
+    .status-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
+    .pago-si { background-color: #d4edda; color: #155724; }
+    .pago-no { background-color: #fff3cd; color: #856404; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- LÓGICA DE PERSISTENCIA (URL) ---
+# Esto permite que si el usuario refresca, la app intente recuperar el grupo de la URL
+query_params = st.query_params
+if "g" in query_params and st.session_state.get("grupo_id") is None:
+    st.session_state.grupo_id = query_params["g"]
+    st.session_state.vista = "seleccionar_usuario"
+
+# ... (El resto de tu diccionario LANGS e init_connection se mantiene igual)
+
+# --- ACTUALIZACIÓN DE URL AL ENTRAR A UN PACTO ---
+# Busca donde asignas el grupo_id y añade esta línea:
+# st.query_params["g"] = gid 
+
+# Por ejemplo, en la sección de 'unirse' o 'crear':
+if st.button(T["btn_crear"]):
+    # ... tu lógica de creación ...
+    st.session_state.grupo_id = gid
+    st.query_params["g"] = gid # <-- ESTO GUARDA EL ID EN LA URL
+    st.rerun()
+
+# --- CONTINÚA TU CÓDIGO NORMALMENTE ---
 
 # --- DICCIONARIO DE IDIOMAS ---
 LANGS = {
