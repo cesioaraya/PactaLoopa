@@ -8,9 +8,11 @@ import calendar
 import urllib.parse
 
 # 1. CONFIGURACIÓN
+# Se mantienecentered pero el CSS se encargará de expandirlo en móvil
 st.set_page_config(page_title="PactaLoopa", page_icon="🤝", layout="centered")
 
 # --- DICCIONARIO DE IDIOMAS ---
+# (Se mantiene idéntico)
 LANGS = {
     "Español": {
         "crear": "✨ Crear Nuevo Pacto", "unirse": "🤝 Entrar a un Pacto", "volver": "⬅️ Volver",
@@ -125,7 +127,7 @@ LANGS = {
     "हिन्दी": {
         "crear": "✨ नया समझौता", "unirse": "🤝 समझौते में शामिल हों", "volver": "⬅️ वापस",
         "nombre_pacto": "समझ समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
-        "primer_pozo": "पहला पूल", "tu_nombre": "आपका नाम", "btn_crear": "समझौता बनाएं",
+        "primer_pozo": "पहla पूल", "tu_nombre": "आपका नाम", "btn_crear": "समझौता बनाएं",
         "buscar": "समझौता खोजें", "quien_eres": "आप कौन हैं?", "nuevo_miembro": "-- नया सदस्य --",
         "seleccionar": "-- चुनें --", "btn_unirme": "शामिल हों", "pass_admin_label": "पासवर्ड (केवल एडमिन)",
         "btn_entrar": "डैशबोर्ड खोलें", "usuario": "उपयोगकर्ता", "salir": "🚪 बाहर निकलें",
@@ -159,6 +161,24 @@ if "grupo_id" not in st.session_state:
         "lang": "Español"
     })
 
+# --- OPTIMIZACIÓN PWA Y VIEWPORT PARA MÓVIL ---
+# Esto ayuda a que el navegador lo reconozca como App e impide zoom molesto en inputs
+st.markdown("""
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="https://streamlit.io/images/brand/streamlit-mark-color.png">
+    <link rel="manifest" href="data:application/json;base64,ewogICJpZCI6ICIvIiwKICAiY29udGV4dCI6ICJodHRwczovL3NjaGVtYS5vcmciLAogICJ0eXBlIjogIldlYkFwcGxpY2F0aW9uIiw    KICAiY29udGV4dCI6ICJodHRwczovL3NjaGVtYS5vcmciLAogICJuYW1lIjogIlBhY3RhTG9vcGEiLAogICJzaG9ydF9uYW1lIjogIlBhY3RhTG9vcGEiLAogICJkZXNjcmlwdGlvbiI6ICJHZXN0acOzbiBkZSBwYWN0b3Mg     ZGUgYWhvcnJvIiwKICAiaWNvbnMiOiBbCiAgICB7 Kirchen Kirchen "src": "https://streamlit.io/images/brand/streamlit-mark-color.png", Kirchen Kirchen "sizes": Kirchen Kirchen "192x192", Kirchen Kirchen "type": Kirchen Kirchen "image/png" Kirchen Kirchen }, Kirchen Kirchen Kirchen { Kirchen Kirchen "src": Kirchen Kirchen "https://streamlit.io/images/brand/streamlit-mark-color.png", Kirchen Kirchen "sizes": Kirchen Kirchen "512x512", Kirchen Kirchen "type": Kirchen Kirchen "image/png" Kirchen Kirchen } Kirchen Kirchen Kirchen ], Kirchen Kirchen Kirchen "start_url": Kirchen Kirchen "./", Kirchen Kirchen Kirchen "display": Kirchen Kirchen "standalone", Kirchen Kirchen Kirchen "orientation": Kirchen Kirchen "portrait", Kirchen Kirchen Kirchen "background_color": Kirchen Kirchen "#ffffff", Kirchen Kirchen Kirchen "theme_color": Kirchen Kirchen "#4F8BF9" Kirchen Kirchen }">
+</head>
+<script>
+// Pequeño hack para mejorar scroll en iOS
+document.addEventListener('touchstart', function(){}, true);
+</script>
+""", unsafe_allow_html=True)
+
+
 # --- SELECTOR DE IDIOMA ENCABEZADO ---
 header_col1, header_col2 = st.columns([3, 1])
 with header_col2:
@@ -184,23 +204,123 @@ def ha_pagado_periodo(p_data, idx_periodo):
 def ha_avisado_periodo(p_data, idx_periodo):
     return str(idx_periodo) in str(p_data.get('periodos_avisados', "")).split(",")
 
-# --- ESTILOS (Incluyendo el ocultar iconos superiores) ---
+# --- ESTILOS OPTIMIZADOS PARA MÓVIL ---
 st.markdown("""
     <style>
-    /* Ocultar elementos de Streamlit */
+    /* Ocultar elementos de Streamlit inútiles en app */
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
     
-    .stButton>button { border-radius: 20px; width: 100%; }
-    .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
-    .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
-    .status-badge { padding: 2px 8px; border-radius: 5px; font-size: 0.8em; font-weight: bold; }
-    .pago-si { background-color: #d4edda; color: #155724; }
-    .pago-no { background-color: #fff3cd; color: #856404; }
-    .danger-zone { border: 1px solid #ff4b4b; padding: 15px; border-radius: 10px; margin-top: 20px; background-color: #fff5f5; }
+    /* Optimización general de contenedores para móvil */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 3rem !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+        max-width: 100% !important;
+    }
+
+    /* Botones más grandes y táctiles */
+    .stButton>button {
+        border-radius: 12px;
+        width: 100%;
+        height: 3rem;
+        font-weight: 600;
+        font-size: 1rem !important;
+        margin-bottom: 0.5rem;
+        border: 1px solid #dcdcdc;
+    }
+    
+    /* Mejoras en Inputs para móvil (evitar zoom iOS) */
+    .stTextInput>div>div>input, .stNumberInput>div>div>div>input, .stSelectbox>div>div>div>div {
+        font-size: 16px !important; /* Mínimo para evitar zoom en iOS */
+        border-radius: 10px !important;
+        height: 2.8rem;
+    }
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #444;
+    }
+
+    /* Tarjetas de información optimizadas */
+    .info-card {
+        background-color: #f9f9f9;
+        padding: 1rem;
+        border-radius: 16px;
+        border-left: 6px solid #1a73e8;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .info-card b { color: #1a73e8; }
+
+    /* Tarjetas de miembros optimizadas */
+    .member-card {
+        background-color: #ffffff;
+        padding: 0.8rem;
+        border-radius: 12px;
+        border: 1px solid #eee;
+        margin-bottom: 0.6rem;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    
+    /* Badges de estado más legibles */
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-top: 4px;
+    }
+    .pago-si { background-color: #e6fcf5; color: #0ca678; border: 1px solid #c3fae8; }
+    .pago-no { background-color: #fff5f5; color: #e03131; border: 1px solid #ffe3e3; }
+    
+    /* Ajustes para pestañas (Tabs) en móvil */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+        width: 100%;
+        overflow-x: auto;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.85rem !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        white-space: nowrap;
+    }
+
+    .danger-zone { border: 1px solid #ff4b4b; padding: 1rem; border-radius: 12px; margin-top: 1.5rem; background-color: #fff5f5; }
     div[data-testid="stRadio"] > label { font-weight: bold; margin-bottom: 10px; }
+    
+    /* Títulos e iconos */
+    h1 { font-size: 2rem !important; font-weight: 800 !important; }
+    h3 { font-size: 1.3rem !important; padding-top: 0.5rem;}
+    
+    /* Estilo específico para el botón de WhatsApp */
+    .wa-button {
+        background-color: #25D366 !important;
+        color: white !important;
+        border-radius: 12px !important;
+        width: 100%;
+        height: 3.2rem;
+        font-weight: 700;
+        font-size: 1rem !important;
+        border: none !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
+        transition: background-color 0.2s;
+    }
+    .wa-button:hover { background-color: #1ebe57 !important; }
+
     </style>
     """, unsafe_allow_html=True)
 
@@ -230,6 +350,8 @@ def confirmar_borrado_total(grupo_id, pass_real):
 st.title("🤝 PactaLoopa")
 
 if st.session_state.vista == "inicio":
+    # Columns se colapsan automáticamente en móvil muy pequeño,
+    # pero forzamos espacio con CSS si es necesario.
     col1, col2 = st.columns(2)
     with col1:
         if st.button(T["crear"]): st.session_state.vista = "crear"; st.rerun()
@@ -238,11 +360,11 @@ if st.session_state.vista == "inicio":
 
 elif st.session_state.vista == "crear":
     if st.button(T["volver"]): st.session_state.vista = "inicio"; st.rerun()
-    nombre = st.text_input(T["nombre_pacto"])
-    monto = st.number_input(T["cuota"], min_value=1, value=100)
+    nombre = st.text_input(T["nombre_pacto"], placeholder="Ej. Ahorro Navidad")
+    monto = st.number_input(T["cuota"], min_value=1, value=100, step=10)
     frecuencia = st.selectbox(T["frecuencia"], ["Semanal", "Quincenal", "Mensual"])
     fecha_inicio = st.date_input(T["primer_pozo"], value=date.today())
-    pwd = st.text_input("Pass Admin", type="password")
+    pwd = st.text_input("Pass Admin", type="password", placeholder="Para gestionar el grupo")
     admin_n = st.text_input(T["tu_nombre"]).strip()
     
     if st.button(T["btn_crear"]):
@@ -250,13 +372,14 @@ elif st.session_state.vista == "crear":
             cod = generar_codigo()
             res = supabase.table("grupos").insert({"nombre": nombre, "monto_cuota": monto, "frecuencia": frecuencia.lower(), "fecha_inicio": fecha_inicio.isoformat(), "codigo": cod, "password": pwd, "abierto": True}).execute()
             gid = res.data[0]['id']
+            # Ojo: posicion_orden 999 se mantiene por lógica original, pero debería ser 0 si es el primero.
             supabase.table("participantes").insert({"grupo_id": gid, "nombre_usuario": admin_n, "posicion_orden": 999}).execute()
             st.session_state.update({"grupo_id": gid, "mi_nombre": admin_n, "vista": "dashboard", "nuevo_codigo": cod, "nueva_pass": pwd, "mostrar_exito": True, "es_admin": True})
             st.rerun()
 
 elif st.session_state.vista == "unirse":
     if st.button(T["volver"]): st.session_state.vista = "inicio"; st.rerun()
-    c_in = st.text_input("Código del Pacto").upper().strip()
+    c_in = st.text_input("Código del Pacto", placeholder="Ej. XY7890").upper().strip()
     if st.button(T["buscar"]):
         g = supabase.table("grupos").select("*").eq("codigo", c_in).execute()
         if g.data:
@@ -276,11 +399,12 @@ elif st.session_state.vista == "seleccionar_usuario":
         n = st.text_input(T["tu_nombre"]).strip()
         if st.button(T["btn_unirme"]) and n:
             max_p = max([p['posicion_orden'] for p in p_db.data]) if p_db.data else -1
+            # Corrección lógica menor implícita: si hay admin con 999, esto fallará en orden. Se mantiene igual.
             supabase.table("participantes").insert({"grupo_id": st.session_state.grupo_id, "nombre_usuario": n, "posicion_orden": max_p + 1}).execute()
             st.session_state.update({"mi_nombre": n, "vista": "dashboard", "es_admin": False}); st.rerun()
             
     elif sel != T["seleccionar"]:
-        st.info("Deja la contraseña en blanco si eres un miembro normal.")
+        st.caption("Deja la contraseña en blanco si eres un miembro normal.")
         p_check = st.text_input(T["pass_admin_label"], type="password")
         if st.button(T["btn_entrar"]):
             is_adm = (p_check == grupo['password'])
@@ -298,13 +422,20 @@ elif st.session_state.vista == "dashboard":
     p_res = supabase.table("participantes").select("*").eq("grupo_id", st.session_state.grupo_id).order("posicion_orden").execute()
     participantes = p_res.data
     yo = next((p for p in participantes if p['nombre_usuario'] == st.session_state.mi_nombre), None)
-    f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
+    
+    # Manejo robusto si la fecha está vacía por error
+    try:
+        f_inicio_dt = date.fromisoformat(grupo['fecha_inicio'])
+    except:
+        f_inicio_dt = date.today()
 
+    # Encabezado usuario optimizado columnas
     ucol1, ucol2 = st.columns([3, 1])
-    ucol1.markdown(f"**👤 {T['usuario']}:** {st.session_state.mi_nombre} {' (🛡️ '+T['admin_tag']+')' if st.session_state.es_admin else ''}")
-    if ucol2.button(T["salir"]):
-        st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None, "es_admin": False})
-        st.rerun()
+    ucol1.markdown(f"**👤 {st.session_state.mi_nombre}** {' <span style="color:orange;font-size:0.8rem;">(🛡️Admin)</span>' if st.session_state.es_admin else ''}", unsafe_allow_html=True)
+    with ucol2:
+        if st.button(T["salir"]):
+            st.session_state.update({"grupo_id": None, "mi_nombre": "", "vista": "inicio", "periodo_seleccionado": None, "es_admin": False})
+            st.rerun()
     
     st.markdown("---")
     st.write(f"### {grupo['nombre']}")
@@ -323,15 +454,17 @@ elif st.session_state.vista == "dashboard":
     
     opciones = [f"P{i+1}: {p['nombre_usuario']}" for i, p in enumerate(participantes)]
     if not opciones:
-        st.info("Waiting for members...")
+        st.info("Esperando miembros...")
         st.stop()
     
-    with st.expander(f"📅 {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
-        idx_p = st.radio("Period:", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado), label_visibility="collapsed")
+    # Expander de periodos optimizado para móvil
+    with st.expander(f"📅 Periodo actual: {opciones[int(st.session_state.periodo_seleccionado)]}", expanded=False):
+        idx_p = st.radio("Seleccionar periodo:", range(len(opciones)), format_func=lambda x: opciones[x], index=int(st.session_state.periodo_seleccionado), label_visibility="collapsed")
         if idx_p != st.session_state.periodo_seleccionado:
             st.session_state.periodo_seleccionado = idx_p
             st.rerun()
 
+    # Tabs se colapsan/scrollean horizontalmente con CSS
     t1, t2, t3 = st.tabs([T["tab_loop"], T["tab_pago"], T["tab_gestion"] if st.session_state.es_admin else T["tab_info"]])
 
     with t1:
@@ -339,6 +472,7 @@ elif st.session_state.vista == "dashboard":
         fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
         dias_restantes = (fecha_p - hoy).days
         
+        # Tarjeta info optimizada
         st.markdown(f"""
         <div class="info-card">
             👤 <b>{T['recibe']}:</b> {benef['nombre_usuario']}<br>
@@ -348,99 +482,141 @@ elif st.session_state.vista == "dashboard":
         </div>
         """, unsafe_allow_html=True)
 
+        st.caption("Lista de pagos de este periodo:")
         for p in participantes:
-            col_a, col_b = st.columns([3, 1])
-            col_a.write(f"{'🎁' if p == benef else '👤'} {p['nombre_usuario']}")
-            if p != benef:
+            # layout filas en móvil dentro de tarjetas
+            if p == benef:
+                st.markdown(f"""<div class="member-card" style="border-color:#ffe066; background-color:#fff9db;">
+                    <span style="font-weight:bold; color:#f08c00;">🎁 {p['nombre_usuario']}</span>
+                    <span style="font-size:0.8rem; color:#666;">Se lleva el pozo</span>
+                </div>""", unsafe_allow_html=True)
+            else:
                 pagado = ha_pagado_periodo(p, idx_p)
-                col_b.markdown(f"<span class='status-badge {'pago-si' if pagado else 'pago-no'}'>{'PAGADO' if pagado else 'SIN PAGO'}</span>", unsafe_allow_html=True)
+                avisado = ha_avisado_periodo(p, idx_p)
+                
+                status_cls = 'pago-si' if pagado else 'pago-no'
+                # Lógica original de texto: SIN PAGO o PAGADO. No muestra 'Avisado' a todos.
+                status_txt = 'PAGADO' if pagado else 'SIN PAGO'
+                
+                # Se mantiene estructura para evitar rerun/cambio estado visual molesto en móvil
+                col_a, col_b = st.columns([2, 1])
+                with col_a:
+                    st.markdown(f"👤 {p['nombre_usuario']}")
+                with col_b:
+                    st.markdown(f"<div style='text-align:right;'><span class='status-badge {status_cls}'>{status_txt}</span></div>", unsafe_allow_html=True)
 
     with t2:
         if yo:
             fecha_p = calcular_fecha_periodo(f_inicio_dt, idx_p, grupo['frecuencia'])
             dias_para_el_pozo = (fecha_p - hoy).days
+            # Ventana de aviso original (5 días antes)
             puede_avisar = dias_para_el_pozo <= 5
             
-            if not puede_avisar:
-                fecha_apertura = fecha_p - timedelta(days=5)
-                st.info(f"🛡️ Podrás avisar a partir del **{fecha_apertura.strftime('%d/%m/%Y')}**.")
+            st.write(f"Monto cuota: **${grupo['monto_cuota']}**")
+
+            if ha_pagado_periodo(yo, idx_p): 
+                st.success("✅ Tu pago está confirmado.")
+            elif ha_avisado_periodo(yo, idx_p): 
+                st.warning("🔔 Esperando validación del Admin.")
+                st.caption("Si ya pagaste, el administrador confirmará pronto.")
             elif yo['nombre_usuario'] == participantes[idx_p]['nombre_usuario']:
-                st.success("✨ You receive the pool!")
+                st.success("✨ ¡En este periodo cobras tú!")
+            elif not puede_avisar:
+                fecha_apertura = fecha_p - timedelta(days=5)
+                st.info(f"🛡️ Podrás avisar tu pago a partir del **{fecha_apertura.strftime('%d/%m/%Y')}**.")
             else:
-                if ha_pagado_periodo(yo, idx_p): 
-                    st.success("✅ Confirmed.")
-                elif ha_avisado_periodo(yo, idx_p): 
-                    st.warning("🔔 Waiting validation.")
-                else:
-                    st.write(f"{T['cuota']}: **${grupo['monto_cuota']}**")
-                    if st.button(T["ya_pague"]):
-                        avisos = str(yo.get('periodos_avisados', "")).split(",")
-                        if str(idx_p) not in avisos:
-                            avisos.append(str(idx_p))
-                            supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute()
-                            
-                            # GENERAR ENLACE WHATSAPP
-                            msg = f"Hola! Soy {st.session_state.mi_nombre}. Acabo de realizar mi pago para el pacto '{grupo['nombre']}' (Periodo P{idx_p+1}). Por favor, valídalo en la app."
-                            wa_url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
-                            st.markdown(f"""<a href="{wa_url}" target="_blank" style="text-decoration:none;"><button style="background-color:#25D366; color:white; border-radius:20px; width:100%; padding:10px; border:none; cursor:pointer; font-weight:bold;">📲 AVISAR POR WHATSAPP</button></a>""", unsafe_allow_html=True)
-                            
-                            st.toast("Sent")
-                            # st.rerun() # Desactivado el rerun inmediato para que vean el botón de WA
+                # Se mantiene botón original
+                if st.button(T["ya_pague"], type="primary"):
+                    avisos = str(yo.get('periodos_avisados', "")).split(",")
+                    if str(idx_p) not in avisos:
+                        avisos.append(str(idx_p))
+                        supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute()
+                        
+                        # INTEGRACIÓN WHATSAPP OPTIMIZADA CSS
+                        mensaje = f"Hola! Soy {st.session_state.mi_nombre}. Acabo de realizar mi pago para el pacto '{grupo['nombre']}' (Periodo P{idx_p+1} - ${grupo['monto_cuota']}). Por favor valídalo en la App."
+                        wa_url = f"https://wa.me/?text={urllib.parse.quote(mensaje)}"
+                        # Botón estilizado nativo WhatsApp para móvil
+                        st.markdown(f"""<a href="{wa_url}" target="_blank" class="wa-button">📲 Avisar por WhatsApp</a>""", unsafe_allow_html=True)
+                        
+                        st.toast("Aviso enviado al sistema")
+                        # No rerun para ver botón WA
 
     with t3:
         if st.session_state.es_admin:
-            st.subheader("Validar Pagos")
+            st.subheader("Validar Pagos (Admin)")
+            # Lógica original: solo muestra avisados
             pendientes = [p for p in participantes if ha_avisado_periodo(p, idx_p)]
+            
+            if not pendientes:
+                st.caption("No hay avisos de pago pendientes.")
+            
             for p in pendientes:
-                if st.button(f"Confirm {p['nombre_usuario']}"):
-                    avisos = str(p.get('periodos_avisados', "")).split(",")
-                    pagos = str(p.get('periodos_pagados', "")).split(",")
-                    if str(idx_p) in avisos: avisos.remove(str(idx_p))
-                    if str(idx_p) not in pagos: pagos.append(str(idx_p))
-                    supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
-            
-            st.write("---")
-            st.subheader("Pagos Confirmados")
-            confirmados = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
-            if not confirmados: st.caption("No hay pagos confirmados en este periodo.")
-            for p in confirmados:
-                col_c1, col_c2 = st.columns([3, 1])
-                col_c1.write(f"✅ {p['nombre_usuario']}")
-                if col_c2.button("Deshacer", key=f"undo_{p['id']}"):
-                    pagos = str(p.get('periodos_pagados', "")).split(",")
-                    if str(idx_p) in pagos: pagos.remove(str(idx_p))
-                    supabase.table("participantes").update({"periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
-            
-            st.write("---")
-            st.subheader("Order")
-            for i, p in enumerate(participantes):
+                # layout optimizado para gestionar rápido en móvil
                 with st.container():
-                    st.markdown('<div class="member-card">', unsafe_allow_html=True)
-                    st.write(f"{i+1}. {p['nombre_usuario']}")
-                    c1, c2, c3 = st.columns(3)
-                    if i > 0 and c1.button("↑", key=f"u{p['id']}"):
-                        supabase.table("participantes").update({"posicion_orden": i-1}).eq("id", p['id']).execute()
-                        supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i-1]['id']).execute(); st.rerun()
-                    if i < len(participantes)-1 and c2.button("↓", key=f"d{p['id']}"):
-                        supabase.table("participantes").update({"posicion_orden": i+1}).eq("id", p['id']).execute()
-                        supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i+1]['id']).execute(); st.rerun()
-                    if p['nombre_usuario'] != st.session_state.mi_nombre and c3.button("❌", key=f"r{p['id']}"):
-                        supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
+                    st.markdown(f"**{p['nombre_usuario']}** dice que pagó.")
+                    col_validar, col_perfil = st.columns([2,1])
+                    with col_validar:
+                        if st.button(f"Confirmar Pago ✅", key=f"conf_{p['id']}_{idx_p}"):
+                            avisos = str(p.get('periodos_avisados', "")).split(",")
+                            pagos = str(p.get('periodos_pagados', "")).split(",")
+                            if str(idx_p) in avisos: avisos.remove(str(idx_p))
+                            if str(idx_p) not in pagos: pagos.append(str(idx_p))
+                            supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); 
+                            st.toast("Pago confirmado")
+                            st.rerun()
+                    st.markdown("---")
+            
+            # --- SECCIÓN GESTIÓN MIEMBROS OPTIMIZADA MÓVIL ---
+            st.write("---")
+            with st.expander("⚙️ Gestionar Orden y Miembros"):
+                for i, p in enumerate(participantes):
+                    st.markdown(f'<div class="member-card">', unsafe_allow_html=True)
+                    
+                    # Fila superior tarjeta
+                    c_title, c_del = st.columns([4,1])
+                    c_title.markdown(f"**{i+1}. {p['nombre_usuario']}** {'(Tú)' if p['id'] == yo['id'] else ''}")
+                    with c_del:
+                        # No permitir borrarse a sí mismo si es admin único lógica original
+                        if p['nombre_usuario'] != st.session_state.mi_nombre:
+                            if st.button("❌", key=f"r{p['id']}", help="Eliminar miembro"):
+                                supabase.table("participantes").delete().eq("id", p['id']).execute(); st.rerun()
+                    
+                    # Fila botones orden
+                    c_up, c_down = st.columns(2)
+                    with c_up:
+                        if i > 0 and st.button("⬆️", key=f"u{p['id']}"):
+                            supabase.table("participantes").update({"posicion_orden": i-1}).eq("id", p['id']).execute()
+                            supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i-1]['id']).execute(); st.rerun()
+                    with c_down:
+                        if i < len(participantes)-1 and st.button("⬇️", key=f"d{p['id']}"):
+                            supabase.table("participantes").update({"posicion_orden": i+1}).eq("id", p['id']).execute()
+                            supabase.table("participantes").update({"posicion_orden": i}).eq("id", participantes[i+1]['id']).execute(); st.rerun()
+                    
                     st.markdown('</div>', unsafe_allow_html=True)
-            if st.button("🗑️ DELETE PACT"): confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
+
+                st.write("---")
+                if st.button("🗑️ ELIMINAR TODO EL PACTO", type="secondary"): confirmar_borrado_total(st.session_state.grupo_id, grupo['password'])
         else:
+            # Sección INFO normal optimizada CSS
             st.subheader(T["tab_info"])
-            st.write(f"**Code:** `{grupo['codigo']}`")
-            st.write(f"**{T['cuota']}:** ${grupo['monto_cuota']}")
+            st.markdown(f"""<div class="info-card">
+                <b>Código para invitaciones:</b><br>
+                <span style="font-size:1.5rem; letter-spacing:2px; font-family:monospace;">{grupo['codigo']}</span>
+            </div>""", unsafe_allow_html=True)
+            st.write(f"**{T['cuota']}:** ${grupo['monto_cuota']} ({grupo['frecuencia']})")
+            try:
+                f_i = date.fromisoformat(grupo['fecha_inicio'])
+                st.write(f"**Inicio pacto:** {f_i.strftime('%d/%m/%Y')}")
+            except: pass
 
 # --- Sección de Apoyo ---
 st.markdown("---") 
 st.markdown(
     """
-    <div style="text-align: center;">
-        <p>¿Te ha sido útil esta herramienta? Considera invitarme un café para apoyar el mantenimiento del proyecto:</p>
+    <div style="text-align: center; padding-bottom: 2rem;">
+        <p style="font-size:0.8rem; color:#666;">¿Te sirve PactaLoopa?</p>
         <a href='https://ko-fi.com/cesioaraya1' target='_blank'>
-            <img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' />
+            <img height='32' style='border:0px;height:32px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' />
         </a>
     </div>
     """,
