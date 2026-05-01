@@ -124,7 +124,7 @@ LANGS = {
     },
     "हिन्दी": {
         "crear": "✨ नया समझौता", "unirse": "🤝 समझौते में शामिल हों", "volver": "⬅️ वापस",
-        "nombre_pacto": "समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
+        "nombre_pacto": "समझ समझौते का नाम", "cuota": "किस्त ($)", "frecuencia": "आवृत्ति",
         "primer_pozo": "पहला पूल", "tu_nombre": "आपका नाम", "btn_crear": "समझौता बनाएं",
         "buscar": "समझौता खोजें", "quien_eres": "आप कौन हैं?", "nuevo_miembro": "-- नया सदस्य --",
         "seleccionar": "-- चुनें --", "btn_unirme": "शामिल हों", "pass_admin_label": "पासवर्ड (केवल एडमिन)",
@@ -184,9 +184,15 @@ def ha_pagado_periodo(p_data, idx_periodo):
 def ha_avisado_periodo(p_data, idx_periodo):
     return str(idx_periodo) in str(p_data.get('periodos_avisados', "")).split(",")
 
-# --- ESTILOS ---
+# --- ESTILOS (Incluyendo el ocultar iconos superiores) ---
 st.markdown("""
     <style>
+    /* Ocultar elementos de Streamlit */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
+    
     .stButton>button { border-radius: 20px; width: 100%; }
     .info-card { background-color: #f8f9fa; padding: 15px; border-radius: 15px; border-left: 5px solid #1a73e8; margin-bottom: 20px; }
     .member-card { background-color: #ffffff; padding: 12px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
@@ -373,14 +379,13 @@ elif st.session_state.vista == "dashboard":
                             avisos.append(str(idx_p))
                             supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos))}).eq("id", yo['id']).execute()
                             
-                            # --- INTEGRACIÓN WHATSAPP ---
-                            mensaje = f"Hola! Soy {yo['nombre_usuario']}. Acabo de pagar la cuota de {grupo['nombre']} del periodo P{idx_p+1} (${grupo['monto_cuota']})."
-                            wa_url = f"https://wa.me/?text={urllib.parse.quote(mensaje)}"
-                            st.markdown(f"""<a href="{wa_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px; border-radius:10px; width:100%; cursor:pointer;">📲 Avisar por WhatsApp</button></a>""", unsafe_allow_html=True)
-                            # ----------------------------
+                            # GENERAR ENLACE WHATSAPP
+                            msg = f"Hola! Soy {st.session_state.mi_nombre}. Acabo de realizar mi pago para el pacto '{grupo['nombre']}' (Periodo P{idx_p+1}). Por favor, valídalo en la app."
+                            wa_url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+                            st.markdown(f"""<a href="{wa_url}" target="_blank" style="text-decoration:none;"><button style="background-color:#25D366; color:white; border-radius:20px; width:100%; padding:10px; border:none; cursor:pointer; font-weight:bold;">📲 AVISAR POR WHATSAPP</button></a>""", unsafe_allow_html=True)
                             
                             st.toast("Sent")
-                            st.rerun()
+                            # st.rerun() # Desactivado el rerun inmediato para que vean el botón de WA
 
     with t3:
         if st.session_state.es_admin:
@@ -394,7 +399,6 @@ elif st.session_state.vista == "dashboard":
                     if str(idx_p) not in pagos: pagos.append(str(idx_p))
                     supabase.table("participantes").update({"periodos_avisados": ",".join(filter(None, avisos)), "periodos_pagados": ",".join(filter(None, pagos))}).eq("id", p['id']).execute(); st.rerun()
             
-            # --- NUEVA SECCIÓN: CANCELAR CONFIRMACIÓN ---
             st.write("---")
             st.subheader("Pagos Confirmados")
             confirmados = [p for p in participantes if ha_pagado_periodo(p, idx_p)]
@@ -430,7 +434,7 @@ elif st.session_state.vista == "dashboard":
             st.write(f"**{T['cuota']}:** ${grupo['monto_cuota']}")
 
 # --- Sección de Apoyo ---
-st.markdown("---") # Línea divisoria
+st.markdown("---") 
 st.markdown(
     """
     <div style="text-align: center;">
